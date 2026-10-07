@@ -50,6 +50,14 @@ export function createCorridorTileLayer({ corridor, apiKey, style, minZoom, maxZ
         finish(new Error('Не удалось загрузить тайл подложки'));
       };
       tile.append(image);
+      // Сглаживаем только границу с запрещёнными ячейками. Соседям fetch не нужен.
+      for (const [side, dx, dy] of [['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]]) {
+        if (corridor.intersectsTile({ z: coords.z, x: coords.x + dx, y: coords.y + dy })) continue;
+        const edge = document.createElement('span');
+        edge.className = `tile-edge-blur edge-${side}`;
+        edge.setAttribute('aria-hidden', 'true');
+        tile.append(edge);
+      }
       notify();
       getTileBlob({ style, coords, apiKey,
         onNetwork() { stats.requested++; notify(); }, onCache() { stats.cacheHits++; notify(); },

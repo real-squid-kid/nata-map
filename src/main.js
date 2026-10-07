@@ -7,6 +7,7 @@ import { createSectionMap } from './map.js';
 import { startSnapshotPolling } from './api.js';
 import { buildTrips, parseTime, recordIssues } from './trips.js';
 import { getTrainPosition, motionLabels } from './motion.js';
+import { automaticNight, themePeriod } from './theme.js';
 
 const app = document.querySelector('#app');
 const diameterColor = appConfig.map.diameterColors[stationsConfig.section.diameter];
@@ -27,6 +28,10 @@ app.innerHTML = `
         </div>
         <div class="map-legend"><span class="route-swatch"></span><span>D2</span><span class="lamp-swatch head-swatch"></span><span>Голова</span><span class="lamp-swatch tail-swatch"></span><span>Хвост</span></div>
         <div class="train-counter"><span id="active-trains">0</span> поездов на карте</div>
+        <aside class="map-inspector inset-surface" aria-label="Карточка на карте" hidden>
+          <button type="button" class="inspector-close instrument-button" aria-label="Закрыть карточку станции">×</button>
+          <div class="inspector-content"></div>
+        </aside>
       </section>
       <aside class="sidebar" aria-label="Станции и сведения">
         <details class="stations-section" id="stations-section" open>
@@ -84,13 +89,14 @@ let localError = null;
 function showTrain(trip) {
   selectedTrain = { tripId: trip.id };
   renderTrainDetails();
+  openInspector('train');
 }
 
 function showRecord(record, station) {
   const trip = model.trips.find((candidate) => candidate.trainNo === record.trainNo
     && candidate.anchors.some((anchor) => anchor.stationId === station.id && anchor.toMoscow === record.toMoscow && anchor.departureTime === record.departureTime));
   if (trip) showTrain(trip);
-  else { selectedTrain = { record, station }; renderTrainDetails(); }
+  else { selectedTrain = { record, station }; renderTrainDetails(); openInspector('train'); }
 }
 
 function renderStationDetails() {
@@ -107,7 +113,8 @@ function renderStationDetails() {
       : `${state.error ? 'Последние данные' : 'Обновлено'} ${formatTime(state.lastSuccessfulAt)}`;
     nodes.push(element('p', status, 'station-distance'));
     if (state?.needReload) nodes.push(element('p', 'Источник сообщает об изменении версии.', 'source-note'));
-    if (state?.error) nodes.push(element('p', 'Ошибка обновления; сохранённое расписание продолжает использоваться.', 'source-note'));
+    if (state?.error) nodes.push(element('p', state.lastSuccessfulAt
+      ? 'Ошибка обновления; сохранённое расписание продолжает использоваться.' : 'Источник не передал расписание станции.', 'source-note'));
     for (const [direction, label] of [[true, 'В Москву'], [false, 'Из Москвы']]) {
       const group = element('section', undefined, 'departures-group');
       group.append(element('h3', label));
@@ -145,6 +152,14 @@ function selectStation(station, pan = true) {
   for (const [id, button] of stationButtons) button.setAttribute('aria-pressed', String(id === station.id));
   renderStationDetails();
   sectionMap?.selectStation(station, { pan });
+  const list = document.querySelector('#station-list');
+  const button = stationButtons.get(station.id);
+  if (list.clientHeight && button) {
+    const row = button.getBoundingClientRect(); const bounds = list.getBoundingClientRect();
+    if (row.top < bounds.top) list.scrollTop += row.top - bounds.top - 5;
+    else if (row.bottom > bounds.bottom) list.scrollTop += row.bottom - bounds.bottom + 5;
+  }
+  if (pan) openInspector('station');
 }
 
 function directionLabel(trip, record) {
@@ -158,16 +173,20 @@ function directionLabel(trip, record) {
 
 function renderTrainDetails() {
   const details = document.querySelector('#train-details');
-  if (!selectedTrain) { details.hidden = true; return; }
+  if (!selectedTrain) { details.hidden = true; if (inspector.dataset.kind === 'train') closeInspector(); return; }
   const trip = selectedTrain.tripId ? model.trips.find((candidate) => candidate.id === selectedTrain.tripId) : null;
   const record = trip || selectedTrain.record;
-  if (!record) { selectedTrain = null; details.hidden = true; return; }
+  if (!record) { selectedTrain = null; details.hidden = true; if (inspector.dataset.kind === 'train') closeInspector(); return; }
   details.hidden = false;
   const header = element('div', undefined, 'train-card-header');
   header.append(element('h2', record.trainNo ? `Поезд № ${record.trainNo}` : 'Поезд без номера'));
   const close = element('button', '×', 'train-card-close');
   close.type = 'button'; close.setAttribute('aria-label', 'Закрыть карточку поезда');
-  close.addEventListener('click', () => { selectedTrain = null; renderTrainDetails(); });
+  close.addEventListener('click', () => {
+    const onMap = inspector.dataset.kind === 'train';
+    selectedTrain = null; renderTrainDetails();
+    if (onMap) fullscreenButton.focus({ preventScroll: true });
+  });
   header.append(close);
   const nodes = [header, element('p', record.destination || 'Конечная неизвестна', 'train-destination'),
     element('p', record.trainClass || 'Тип неизвестен', 'station-distance')];
@@ -214,7 +233,7 @@ for (const station of stationsConfig.stations) {
   const button = element('button', undefined, 'station-button');
   button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.dataset.stationId = station.id;
   const dot = element('span', undefined, 'station-dot'); dot.setAttribute('aria-hidden', 'true');
-  button.append(dot, element('span', station.name));
+  button.append(dot, element('span', station.name, 'station-name'));
   button.addEventListener('click', () => selectStation(station));
   item.append(button); document.querySelector('#station-list').append(item); stationButtons.set(station.id, button);
 }
@@ -245,19 +264,28 @@ sectionMap = createSectionMap({
   },
 });
 selectStation(selectedStation, false);
-let night = false;
-try { night = localStorage.getItem('nata-map-theme') === 'night'; } catch { /* Локальные настройки необязательны. */ }
+let manualTheme = null;
+try { manualTheme = JSON.parse(localStorage.getItem('nata-map-theme-override')); } catch { /* Локальные настройки необязательны. */ }
+let night = automaticNight();
+function updateTheme() {
+  const next = manualTheme?.period === themePeriod() && typeof manualTheme.night === 'boolean'
+    ? manualTheme.night : automaticNight();
+  if (next !== night) { night = next; applyTheme(); }
+}
 function applyTheme() {
   document.documentElement.dataset.theme = night ? 'night' : 'day';
   sectionMap.setNight(night);
   const button = document.querySelector('#theme-toggle');
   button.setAttribute('aria-pressed', String(night));
   button.textContent = night ? 'Дневной режим' : 'Ночной режим';
+  button.title = 'Автоматически: ночь с 19:00 до 07:00 по Москве. Ручной выбор действует до следующей смены периода.';
 }
+updateTheme();
 applyTheme();
 document.querySelector('#theme-toggle').addEventListener('click', () => {
   night = !night; applyTheme();
-  try { localStorage.setItem('nata-map-theme', night ? 'night' : 'day'); } catch { /* Сохраняем режим текущей вкладки. */ }
+  manualTheme = { night, period: themePeriod() };
+  try { localStorage.setItem('nata-map-theme-override', JSON.stringify(manualTheme)); } catch { /* Сохраняем режим текущей вкладки. */ }
 });
 document.querySelector('#overview').addEventListener('click', sectionMap.fitSection);
 document.querySelector('#zoom-in').addEventListener('click', sectionMap.zoomIn);
@@ -265,28 +293,45 @@ document.querySelector('#zoom-out').addEventListener('click', sectionMap.zoomOut
 
 const mapFrame = document.querySelector('.map-frame');
 const fullscreenButton = document.querySelector('#fullscreen');
-function updateFullscreen() {
-  const expanded = document.fullscreenElement === mapFrame || mapFrame.classList.contains('is-expanded');
-  fullscreenButton.setAttribute('aria-pressed', String(expanded));
-  fullscreenButton.setAttribute('aria-label', expanded ? 'Вернуть карту в окно' : 'Развернуть карту');
+const inspector = document.querySelector('.map-inspector');
+let inspectedNode = null;
+let inspectorPlaceholder = null;
+function closeInspector() {
+  if (inspectedNode) inspectorPlaceholder.replaceWith(inspectedNode);
+  inspectedNode = null; inspectorPlaceholder = null;
+  inspector.hidden = true; delete inspector.dataset.kind;
 }
-async function toggleFullscreen() {
-  if (document.fullscreenElement === mapFrame) await document.exitFullscreen();
-  else if (mapFrame.classList.contains('is-expanded')) mapFrame.classList.remove('is-expanded');
-  else {
-    try {
-      if (!mapFrame.requestFullscreen) throw new Error('Fullscreen API недоступен');
-      await mapFrame.requestFullscreen();
-    } catch { mapFrame.classList.add('is-expanded'); }
-  }
+function openInspector(kind) {
+  if (!mapFrame.classList.contains('is-expanded')) return;
+  closeInspector();
+  inspectedNode = document.querySelector(kind === 'train' ? '#train-details' : '#station-details');
+  inspectorPlaceholder = document.createComment('Место карточки в боковой панели');
+  inspectedNode.before(inspectorPlaceholder);
+  inspector.querySelector('.inspector-content').append(inspectedNode);
+  inspector.dataset.kind = kind; inspector.hidden = false; inspector.scrollTop = 0;
+}
+inspector.querySelector('.inspector-close').addEventListener('click', () => { closeInspector(); fullscreenButton.focus({ preventScroll: true }); });
+function updateFullscreen() {
+  const expanded = mapFrame.classList.contains('is-expanded');
+  document.body.classList.toggle('map-expanded', expanded);
+  for (const node of document.querySelectorAll('.sidebar, .panel-header, .panel-footer')) node.inert = expanded;
+  if (!expanded) closeInspector();
+  fullscreenButton.setAttribute('aria-pressed', String(expanded));
+  fullscreenButton.setAttribute('aria-label', expanded ? 'Вернуть карту в панель' : 'Развернуть карту на всё окно браузера');
+  fullscreenButton.title = expanded ? 'Вернуть карту в панель (Esc)' : 'На всё окно браузера';
+}
+function toggleFullscreen() {
+  mapFrame.classList.toggle('is-expanded');
   updateFullscreen();
 }
 function exitExpanded(event) {
-  if (event.key === 'Escape') { mapFrame.classList.remove('is-expanded'); updateFullscreen(); }
+  if (event.key === 'Escape' && mapFrame.classList.contains('is-expanded')) {
+    mapFrame.classList.remove('is-expanded'); updateFullscreen(); fullscreenButton.focus({ preventScroll: true });
+  }
 }
 fullscreenButton.addEventListener('click', toggleFullscreen);
-document.addEventListener('fullscreenchange', updateFullscreen);
 document.addEventListener('keydown', exitExpanded);
+updateFullscreen();
 
 const stopPolling = startSnapshotPolling({
   intervalMs: appConfig.client.snapshotPollIntervalMs,
@@ -326,6 +371,7 @@ function animate(timestamp) {
 }
 frame = requestAnimationFrame(animate);
 function updateClock() {
+  updateTheme();
   const clock = document.querySelector('#moscow-clock');
   clock.textContent = `${clockFormatter.format(Date.now())} · Москва`;
   clock.dateTime = new Date().toISOString();
@@ -347,6 +393,6 @@ document.addEventListener('visibilitychange', updateClock);
 if (import.meta.hot) import.meta.hot.dispose(() => {
   stopPolling(); cancelAnimationFrame(statsFrame); cancelAnimationFrame(frame); clearInterval(clockTimer);
   document.removeEventListener('visibilitychange', updateClock); sectionMap.destroy();
-  document.removeEventListener('fullscreenchange', updateFullscreen);
+  document.body.classList.remove('map-expanded');
   document.removeEventListener('keydown', exitExpanded);
 });

@@ -4,7 +4,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 const stations = JSON.parse(await readFile(new URL('../../config/stations.json', import.meta.url), 'utf8')).stations;
 const instant = new Date('2026-10-07T12:00:00+03:00');
 const iso = (seconds) => new Date(instant.getTime() + seconds * 1000).toISOString();
-async function stubTiles(page, delayMs = 0) {
+async function stubTiles(page, delayMs = 0, svg = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#d8ded5"/></svg>') {
   let intercepted = 0;
   const byTile = new Map();
   await page.route((url) => url.hostname.endsWith('.thunderforest.com'), async (route) => {
@@ -13,7 +13,7 @@ async function stubTiles(page, delayMs = 0) {
     byTile.set(path, (byTile.get(path) || 0) + 1);
     if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
     return route.fulfill({ contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' },
-      body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#d8ded5"/></svg>' });
+      body: svg });
   });
   return Object.assign(() => intercepted, { byTile });
 }
@@ -155,9 +155,10 @@ test('планшет: центр станции, сворачивание и п�
     expect(Math.abs(marker.x + marker.width / 2 - (frame.x + frame.width / 2))).toBeLessThan(2);
     expect(Math.abs(marker.y + marker.height / 2 - (frame.y + frame.height / 2))).toBeLessThan(2);
   }
-  await expect(page.locator('.map-panel')).toHaveJSProperty('clientHeight', 550);
+  await expect.poll(async () => (await page.locator('.map-panel').boundingBox()).height).toBe(552);
   await page.locator('#fullscreen').click();
   await expect(page.locator('#fullscreen')).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => document.fullscreenElement)).toBeNull();
   await expect.poll(async () => (await page.locator('#map').boundingBox()).width).toBe(1024);
   await expect.poll(async () => (await page.locator('#map').boundingBox()).height).toBe(600);
   const stationCenterError = async () => {
@@ -170,7 +171,7 @@ test('планшет: центр станции, сворачивание и п�
   await page.screenshot({ path: 'var/qa/tablet-fullscreen.png' });
   await page.locator('#fullscreen').click();
   await expect(page.locator('#fullscreen')).toHaveAttribute('aria-pressed', 'false');
-  // WebView без Fullscreen API разворачивает карту в пределах окна.
+  // Разворачивание всегда остаётся в окне браузера, Fullscreen API не нужен.
   await page.locator('.map-frame').evaluate((element) => { element.requestFullscreen = undefined; });
   await page.locator('#fullscreen').click();
   await expect(page.locator('.map-frame')).toHaveClass(/is-expanded/);
@@ -298,4 +299,79 @@ test('быстрый zoom при незавершённой загрузке н�
   await expect(page.locator('#tiles-failed')).toHaveText('0');
   expect(requests()).toBeGreaterThan(0);
   expect(Math.max(...requests.byTile.values())).toBe(1);
+});
+
+test('автоматическая ночь по Москве, ручной выбор до следующего периода и переход через полночь', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-07T18:59:00+03:00') });
+  await page.clock.setFixedTime(new Date('2026-10-07T18:59:00+03:00'));
+  await page.route('**/api/state', (route) => route.fulfill({ json: fixture() }));
+  await stubTiles(page);
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'day');
+  await page.clock.setFixedTime(new Date('2026-10-07T19:00:00+03:00'));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+  await page.locator('#theme-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'day');
+  await page.clock.setFixedTime(new Date('2026-10-08T00:01:00+03:00'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'day');
+  await page.clock.setFixedTime(new Date('2026-10-08T07:00:00+03:00'));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'day');
+  await page.clock.setFixedTime(new Date('2026-10-08T19:00:00+03:00'));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+});
+
+test('список без скачков hover, мягкий край тайлов и карточки поверх развёрнутой карты', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.clock.install({ time: instant });
+  await page.route('**/api/state', (route) => route.fulfill({ json: fixture() }));
+  const requests = await stubTiles(page, 0, '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#bed0b3"/><path d="M-10 60 Q128 0 266 100 M80 -10 Q200 130 70 266" stroke="#f4efd9" stroke-width="16" fill="none"/><path d="M-10 60 Q128 0 266 100 M80 -10 Q200 130 70 266" stroke="#9da69b" stroke-width="1" fill="none"/></svg>');
+  await page.goto('/');
+  const list = page.locator('#station-list');
+  expect((await list.boundingBox()).height).toBeLessThanOrEqual(320);
+  const row = page.locator('.station-button[data-station-id="dmitrovskaya"]');
+  const before = await row.boundingBox();
+  await row.hover();
+  expect(await row.boundingBox()).toEqual(before);
+  await expect(row).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(row.locator('.station-name')).not.toHaveCSS('box-shadow', 'none');
+  const blur = page.locator('.tile-edge-blur').first();
+  await expect(blur).toHaveCSS('backdrop-filter', 'blur(5px)');
+  await expect(page.locator('.corridor-tile[data-in-corridor="false"] img')).toHaveCount(0);
+  // Здесь часы идут: Leaflet использует Date.now для появления тайлов.
+  await expect(page.locator('#tiles-pending')).toHaveText('0');
+  await expect(page.locator('.corridor-tile[data-tile-state="loaded"]').first()).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: 'var/qa/frontend-day.png' });
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await page.locator('.station-button[data-station-id="grazhdanskaya"]').click();
+  await page.locator('#fullscreen').click();
+  await expect(page.locator('.map-inspector')).toBeHidden();
+  const marker = page.locator('.station-marker[data-station-id="grazhdanskaya"]');
+  await marker.focus(); await page.keyboard.press('Space');
+  await expect(page.locator('.map-inspector #station-details h2')).toHaveText('Гражданская');
+  await page.locator('.inspector-close').click();
+  await expect(page.locator('.map-inspector')).toBeHidden();
+  await page.locator('.train-visual').first().focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('.map-inspector #train-details')).toBeVisible();
+  await page.screenshot({ path: 'var/qa/frontend-expanded-card.png' });
+  await page.locator('.map-inspector .train-card-close').click();
+  await expect(page.locator('.map-inspector')).toBeHidden();
+  await expect(page.locator('#fullscreen')).toBeFocused();
+  await page.locator('.train-visual').first().focus(); await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sidebar #train-details')).toBeVisible();
+  await expect(page.locator('#fullscreen')).toBeFocused();
+  await page.locator('#theme-toggle').click();
+  await page.screenshot({ path: 'var/qa/frontend-night.png' });
+  await page.setViewportSize({ width: 360, height: 780 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+  await page.locator('#fullscreen').click();
+  await expect.poll(async () => (await page.locator('#map').boundingBox()).height).toBe(780);
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: 'var/qa/frontend-mobile.png' });
+  expect(requests()).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
 });
