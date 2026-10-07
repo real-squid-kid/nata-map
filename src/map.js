@@ -2,9 +2,10 @@ import L from 'leaflet';
 import { createCorridor } from './corridor.js';
 import { createCorridorTileLayer } from './corridor-tiles.js';
 import { createTrackGeometry } from './geometry.js';
-import { getTrainPosition } from './motion.js';
+import { createTrainRenderer } from './train-renderer.js';
 
 export function createSectionMap({ container, railway, stationsConfig, options, motion, apiKey, onSelectStation, onSelectTrain, onStats, onZoom }) {
+  let night = false;
   const coordinates = railway.features[0].geometry.coordinates;
   const latLngs = coordinates.map(([longitude, latitude]) => [latitude, longitude]);
   const sectionBounds = L.latLngBounds(latLngs);
@@ -41,8 +42,19 @@ export function createSectionMap({ container, railway, stationsConfig, options, 
   // Leaflet откладывает добавление слоёв до установки вида. Сначала fitBounds,
   // чтобы у добавленных ниже маркеров сразу существовали DOM-элементы.
   const fitSection = () => map.fitBounds(sectionBounds, { padding: [40, 45], maxZoom: options.overviewMaxZoom, animate: false });
-  map.on('zoomend', () => onZoom(map.getZoom()));
+  function updateNavigationBounds(zoom = map.getZoom()) {
+    // Ограничиваем центр карты, позволяя окну выходить за край участка.
+    // Иначе maxBounds сдвигает крайние станции относительно центра окна.
+    const halfSize = map.getSize().divideBy(2);
+    map.setMaxBounds(L.latLngBounds(
+      map.unproject(map.project(navigationBounds.getNorthWest(), zoom).subtract(halfSize), zoom),
+      map.unproject(map.project(navigationBounds.getSouthEast(), zoom).add(halfSize), zoom),
+    ));
+  }
+  map.on('zoomend', () => { updateNavigationBounds(); onZoom(map.getZoom()); });
+  map.on('resize', () => updateNavigationBounds());
   fitSection();
+  updateNavigationBounds();
   onZoom(map.getZoom());
   map.on('move resize viewreset', updateShade);
   updateShade();
@@ -94,69 +106,23 @@ export function createSectionMap({ container, railway, stationsConfig, options, 
     markers.set(station.id, marker);
   }
 
-  const trainLayers = new Map();
-  function createTrain(trip) {
-    const body = L.polyline([], { pane: 'trains', color: diameterColor, weight: 8, lineCap: 'round', interactive: false });
-    const head = L.circleMarker([0, 0], { pane: 'trains', radius: 3, stroke: false, fillColor: '#fff', fillOpacity: 1, interactive: false, className: 'train-head' });
-    const tail = L.circleMarker([0, 0], { pane: 'trains', radius: 3, stroke: false, fillColor: '#f33237', fillOpacity: 1, interactive: false, className: 'train-tail' });
-    const hit = L.polyline([], { pane: 'trains', color: '#000', weight: 20, opacity: 0, className: 'train-hit' });
-    const group = L.layerGroup([body, head, tail, hit]).addTo(map);
-    const label = document.createElement('span');
-    label.textContent = `№ ${trip.trainNo} · ${trip.destination || 'Конечная неизвестна'}`;
-    hit.bindTooltip(label, { direction: 'top', className: 'station-tooltip' });
-    const entry = { trip, group, body, head, tail, hit, label };
-    hit.on('click', () => onSelectTrain(entry.trip));
-    const element = hit.getElement();
-    element.setAttribute('tabindex', '0');
-    element.setAttribute('role', 'button');
-    element.setAttribute('aria-label', label.textContent);
-    element.dataset.trainId = trip.id;
-    element.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectTrain(entry.trip); }
-    });
-    element.addEventListener('focus', () => hit.openTooltip());
-    element.addEventListener('blur', () => hit.closeTooltip());
-    return entry;
-  }
-
-  function renderTrains(trips, now) {
-    const visibleIds = new Set();
-    for (const trip of trips) {
-      const position = getTrainPosition(trip, now, stationsConfig.stations, motion, track.length);
-      if (!position.visible) continue;
-      visibleIds.add(trip.id);
-      let entry = trainLayers.get(trip.id);
-      if (!entry) { entry = createTrain(trip); trainLayers.set(trip.id, entry); }
-      entry.trip = trip;
-      const s = position.centerMeters;
-      const halfLength = motion.trainLengthMeters / 2;
-      const points = track.slice(s - halfLength, s + halfLength);
-      entry.body.setLatLngs(points);
-      entry.hit.setLatLngs(points);
-      const headS = s + trip.direction * halfLength;
-      const tailS = s - trip.direction * halfLength;
-      entry.head.setLatLng(track.pointAt(headS)).setStyle({ fillOpacity: headS >= 0 && headS <= track.length ? 1 : 0 });
-      entry.tail.setLatLng(track.pointAt(tailS)).setStyle({ fillOpacity: tailS >= 0 && tailS <= track.length ? 1 : 0 });
-      const label = `№ ${trip.trainNo} · ${trip.destination || 'Конечная неизвестна'}`;
-      if (entry.label.textContent !== label) {
-        entry.label.textContent = label;
-        entry.hit.getElement().setAttribute('aria-label', label);
-      }
-    }
-    for (const [id, entry] of trainLayers) {
-      if (!visibleIds.has(id)) { entry.group.remove(); trainLayers.delete(id); }
-    }
-    return visibleIds.size;
-  }
+  const trains = createTrainRenderer({
+    map, track, stations: stationsConfig.stations, motion, color: diameterColor,
+    options: options.trainRendering, onSelect: onSelectTrain, isNight: () => night,
+  });
 
   const observer = new ResizeObserver(() => {
-    map.invalidateSize({ pan: false });
+    map.invalidateSize({ pan: true, animate: false });
   });
   observer.observe(container);
 
   return {
     fitSection,
-    renderTrains,
+    renderTrains: trains.render,
+    setNight(enabled) {
+      night = enabled;
+      shade.style.background = `rgba(18, 23, 20, ${enabled ? options.nightDimmingOpacity : options.dimmingOpacity})`;
+    },
     zoomIn: () => map.zoomIn(),
     zoomOut: () => map.zoomOut(),
     selectStation(station, { pan = true } = {}) {
@@ -164,10 +130,14 @@ export function createSectionMap({ container, railway, stationsConfig, options, 
         marker.getElement().classList.toggle('is-selected', id === station.id);
         marker.getElement().setAttribute('aria-pressed', String(id === station.id));
       }
-      if (pan) map.panTo(markers.get(station.id).getLatLng(), { animate: false });
+      if (pan) {
+        updateNavigationBounds(options.stationFocusZoom);
+        map.setView(markers.get(station.id).getLatLng(), options.stationFocusZoom, { animate: false });
+      }
     },
     destroy() {
       observer.disconnect();
+      trains.destroy();
       map.remove();
     },
   };

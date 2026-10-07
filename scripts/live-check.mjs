@@ -10,8 +10,9 @@ assert.equal(response.status, 200);
 const state = await response.json();
 assert.equal(state.schemaVersion, 1);
 const snapshots = Object.values(state.stations);
-assert.equal(snapshots.length, 3);
-assert(snapshots.every((s) => s.lastSuccessfulAt && s.trains.length && s.error === null));
+assert.equal(snapshots.length, config.pollStationApiIds.length);
+assert(snapshots.every((s) => s.lastSuccessfulAt || s.error), 'Каждая станция должна иметь результат попытки опроса');
+assert(snapshots.some((s) => s.lastSuccessfulAt && s.trains.length), 'Нужно доступное реальное расписание');
 const model = buildTrips(state, config);
 const now = Date.now();
 const active = model.trips.map((trip) => ({ trip, position: getTrainPosition(trip, now, config.stations, app.motion, config.section.geometryLengthMeters) }))
@@ -20,7 +21,10 @@ assert(model.trips.some((trip) => trip.anchors.length > 1), 'Нужны сопо
 assert(active.every((entry) => Number.isFinite(entry.position.centerMeters)));
 console.log(JSON.stringify({
   stations: snapshots.map((s) => ({ id: s.apiStationId, records: s.trains.length, updated: s.lastSuccessfulAt, needReload: s.needReload })),
+  errors: snapshots.filter((s) => s.error).map((s) => ({ stationId: s.stationId, error: s.error })),
   trips: model.trips.length, withMultipleAnchors: model.trips.filter((trip) => trip.anchors.length > 1).length,
-  active: active.map(({ trip, position }) => ({ trainNo: trip.trainNo, direction: trip.direction, anchors: trip.anchors.length, mode: position.mode })),
+  activeTrains: active.length,
+  sourceFlagsChangedWithinRun: model.trips.filter((trip) => new Set(trip.anchors.map((anchor) => anchor.toMoscow)).size > 1).length,
+  directionZones: Object.fromEntries(['north', 'south'].map((zone) => [zone, config.stations.filter((station) => station.directionZone === zone && state.stations[station.id]?.lastSuccessfulAt).length])),
   unplaced: model.unplaced.length,
 }, null, 2));

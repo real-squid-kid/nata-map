@@ -39,28 +39,43 @@ function timestampOf(mixed $value): ?int
     return $timestamp === false ? null : $timestamp;
 }
 
+function travelDirection(array $train, array $station): ?int
+{
+    if (in_array($train['travelDirection'] ?? null, [-1, 1], true)) return $train['travelDirection'];
+    if (!is_bool($train['toMoscow'] ?? null)) return null;
+    $step = array_key_exists('apiToMoscowDirectionStep', $station) ? $station['apiToMoscowDirectionStep'] : 1;
+    return in_array($step, [-1, 1], true) ? ($train['toMoscow'] ? $step : -$step) : null;
+}
+
 function mergeObservations(array $history, array $trains, array $station, string $seenAt, int $windowSeconds): array
 {
     foreach ($trains as $train) {
+        $train['travelDirection'] = travelDirection($train, $station);
+        $train['alongTrackMeters'] = $station['alongTrackMeters'] ?? null;
         $departure = timestampOf($train['departureTime']);
         $runId = null;
-        if ($train['trainNo'] !== null && is_bool($train['toMoscow']) && $departure !== null) {
+        if ($train['trainNo'] !== null && $train['travelDirection'] !== null && $departure !== null) {
+            $identityTime = timestampOf($train['scheduleTime'] ?? null) ?? $departure;
             $runs = [];
+            $excluded = [];
             foreach ($history as $old) {
-                if ($old['trainNo'] !== $train['trainNo'] || $old['toMoscow'] !== $train['toMoscow'] || !$old['runId']) continue;
-                $oldTime = timestampOf($old['departureTime']);
+                $oldDirection = $old['travelDirection'] ?? ($old['toMoscow'] ? 1 : -1);
+                if ($old['trainNo'] !== $train['trainNo'] || $oldDirection !== $train['travelDirection'] || !$old['runId']) continue;
+                $oldTime = timestampOf($old['scheduleTime'] ?? null) ?? timestampOf($old['departureTime']);
                 if ($oldTime === null) continue;
                 $id = $old['runId'];
+                if ($old['stationId'] === $station['id'] && abs($identityTime - $oldTime) > 1800) $excluded[$id] = true;
                 $runs[$id]['minimum'] = min($runs[$id]['minimum'] ?? $oldTime, $oldTime);
                 $runs[$id]['maximum'] = max($runs[$id]['maximum'] ?? $oldTime, $oldTime);
-                $runs[$id]['distance'] = min($runs[$id]['distance'] ?? PHP_INT_MAX, abs($departure - $oldTime));
+                $runs[$id]['distance'] = min($runs[$id]['distance'] ?? PHP_INT_MAX, abs($identityTime - $oldTime));
             }
-            $candidates = array_filter($runs, static fn($run) => max($run['maximum'], $departure) - min($run['minimum'], $departure) <= $windowSeconds);
+            $candidates = array_filter($runs, static fn($run, $id) => !isset($excluded[$id])
+                && max($run['maximum'], $identityTime) - min($run['minimum'], $identityTime) <= $windowSeconds, ARRAY_FILTER_USE_BOTH);
             uasort($candidates, static fn($a, $b) => $a['distance'] <=> $b['distance']);
             $runId = array_key_first($candidates);
             if ($runId === null) {
                 $date = (new DateTimeImmutable('@' . $departure))->setTimezone(new DateTimeZone('Europe/Moscow'))->format('Y-m-d');
-                $runId = $date . ':' . $train['trainNo'] . ':' . ($train['toMoscow'] ? 'to' : 'from') . ':' . $departure;
+                $runId = $date . ':' . $train['trainNo'] . ':' . $train['travelDirection'] . ':' . $departure;
             }
         }
         // Записи без номера не объединяются между станциями.

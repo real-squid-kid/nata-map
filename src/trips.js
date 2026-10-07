@@ -1,3 +1,5 @@
+import { matchesStationName } from './station-names.js';
+
 export function parseTime(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return NaN;
   return Date.parse(value);
@@ -12,8 +14,6 @@ export function recordIssues(record, station) {
   return issues;
 }
 
-const normalizeName = (name) => String(name || '').toLocaleLowerCase('ru-RU').replaceAll('ё', 'е').replace(/\s+/g, ' ').trim();
-
 export function buildTrips(snapshot, config) {
   const stations = new Map(config.stations.map((station) => [station.id, station]));
   const groups = new Map();
@@ -26,7 +26,11 @@ export function buildTrips(snapshot, config) {
   const trips = [];
   for (const [id, observations] of groups) {
     const latest = [...observations].sort((a, b) => (parseTime(b.lastSeenAt) || 0) - (parseTime(a.lastSeenAt) || 0))[0];
-    const direction = latest.toMoscow ? config.section.toMoscowDirectionStep : config.section.fromMoscowDirectionStep;
+    const latestStation = stations.get(latest.stationId);
+    const direction = latest.travelDirection || (latest.toMoscow
+      ? latestStation.apiToMoscowDirectionStep ?? config.section.toMoscowDirectionStep
+      : -(latestStation.apiToMoscowDirectionStep ?? config.section.toMoscowDirectionStep ?? -config.section.fromMoscowDirectionStep));
+    if (direction !== 1 && direction !== -1) continue;
     const anchors = observations.map((record) => ({
       ...record, time: parseTime(record.departureTime), station: stations.get(record.stationId),
       s: stations.get(record.stationId).alongTrackMeters,
@@ -35,7 +39,7 @@ export function buildTrips(snapshot, config) {
     for (let i = 1; i < anchors.length; i++) {
       if (anchors[i].time - anchors[i - 1].time <= 30000) warnings.push('Противоречивые временные точки');
     }
-    const terminal = config.stations.find((station) => normalizeName(station.name) === normalizeName(latest.destination)) || null;
+    const terminal = config.stations.find((station) => matchesStationName(latest.destination, station)) || null;
     trips.push({ id, trainNo: latest.trainNo, direction, toMoscow: latest.toMoscow, anchors, terminal,
       destination: latest.destination, trainClass: latest.trainClass, stops: latest.stops,
       warnings: [...new Set(warnings)], observations });

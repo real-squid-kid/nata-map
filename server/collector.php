@@ -17,7 +17,12 @@ ftruncate($lock, 0); fwrite($lock, (string) getmypid()); fflush($lock);
 $statePath = $directory . '/state.json';
 $state = readJsonFile($statePath, ['schemaVersion' => 1, 'stations' => [], 'observations' => [], 'collector' => []]);
 $history = [];
-foreach ($state['observations'] as $observation) $history[$observation['id']] = $observation;
+$stationMap = array_column($config['stations'], null, 'id');
+foreach ($state['observations'] as $observation) {
+    if (!isset($stationMap[$observation['stationId']])) continue;
+    $observation['travelDirection'] = travelDirection($observation, $stationMap[$observation['stationId']]);
+    $history[$observation['id']] = $observation;
+}
 $once = in_array('--once', $argv, true);
 
 function publishState(string $path, array &$state, array $history): void
@@ -29,6 +34,12 @@ function publishState(string $path, array &$state, array $history): void
 
 // Сохраняем межзапросный интервал и паузу цикла даже при быстром перезапуске процесса.
 $nextCycle = timestampOf($state['collector']['nextCycleAt'] ?? null) ?? 0;
+$lastCompleted = timestampOf($state['collector']['cycleCompletedAt'] ?? null);
+if ($lastCompleted !== null && $nextCycle < $lastCompleted + $options['cyclePauseSeconds']) {
+    $nextCycle = $lastCompleted + $options['cyclePauseSeconds'];
+    $state['collector']['nextCycleAt'] = gmdate('Y-m-d\TH:i:s\Z', $nextCycle);
+    publishState($statePath, $state, $history);
+}
 while (true) {
     $wait = $nextCycle - time();
     if ($wait > 0) { sleep(min($wait, 5)); continue; }

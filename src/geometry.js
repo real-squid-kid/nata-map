@@ -15,15 +15,19 @@ export function createTrackGeometry(feature) {
     const end = coordinates[high];
     return [start[1] + (end[1] - start[1]) * fraction, start[0] + (end[0] - start[0]) * fraction];
   }
-  function slice(from, to) {
+  function positions(from, to) {
     const start = Math.max(0, Math.min(length, Math.min(from, to)));
     const end = Math.max(0, Math.min(length, Math.max(from, to)));
-    const result = [pointAt(start)];
-    for (let index = 1; index < distances.length - 1; index++) {
-      if (distances[index] > start && distances[index] < end) result.push([coordinates[index][1], coordinates[index][0]]);
+    const result = [start];
+    let low = 1; let high = distances.length - 1;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (distances[middle] <= start) low = middle + 1; else high = middle;
     }
-    result.push(pointAt(end));
+    for (let index = low; index < distances.length - 1 && distances[index] < end; index++) result.push(distances[index]);
+    result.push(end);
     return result;
   }
-  return { length, pointAt, slice };
+  const slice = (from, to) => positions(from, to).map(pointAt);
+  return { length, pointAt, slice, positions };
 }

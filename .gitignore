@@ -1,6 +1,17 @@
 node_modules/
 dist/
 .env
+/response.txt
+# Локальные инструкции и материалы общения с LLM
+/response*.txt
+/scripts/prepare-d2-catalog.mjs
+/AGENTS.md
+/CONTEXT.MD
+/docs/archive/
+/.llm/
+/llm/
+/.agents/
+/.codex/
 .env.*
 !.env.example
 config/local.json

@@ -39,7 +39,7 @@ body {
 
 .map-panel {
   height: calc(100dvh - 48px);
-  min-height: 620px;
+  min-height: min(620px, calc(100dvh - 48px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -88,6 +88,7 @@ body {
 .instrument-button:active { background: #dedfd5; box-shadow: inset 0 1px 3px #3d423b30; transform: translateY(1px); }
 .instrument-button:disabled { cursor: default; opacity: 0.45; }
 .overview-button { padding: 10px 15px; white-space: nowrap; }
+.theme-button { padding: 10px 12px; white-space: nowrap; }
 
 .workspace {
   display: grid;
@@ -116,6 +117,15 @@ body {
   z-index: 800;
 }
 .zoom-button { width: 38px; height: 38px; font-size: 25px; line-height: 1; }
+.fullscreen-button { width: 38px; height: 38px; font-size: 23px; }
+.map-frame:fullscreen { width: 100%; height: 100%; border: none; border-radius: 0; }
+.map-frame.is-expanded { position: fixed; inset: 0; z-index: 2000; width: 100%; height: 100dvh; border: none; border-radius: 0; }
+.stations-section > summary { cursor: pointer; }
+.stations-section > summary::before { content: '▾'; font-size: 12px; }
+.stations-section:not([open]) > summary::before { content: '▸'; }
+.schedule-section { margin-top: 22px; padding: 17px; }
+.schedule-section > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.schedule-section .station-details { padding: 0; margin-top: 12px; }
 .map-legend {
   display: flex;
   align-items: center;
@@ -252,8 +262,15 @@ body {
 .station-marker.is-selected .station-pin { background: var(--diameter-color); box-shadow: 0 0 0 2px var(--diameter-color), 0 2px 5px #50332260; }
 .train-head { filter: drop-shadow(0 0 3px #fff9); }
 .train-tail { filter: drop-shadow(0 0 3px #f3323799); }
-.train-hit { pointer-events: stroke; cursor: pointer; }
-.train-hit:focus-visible { outline: none; stroke-opacity: 0.25; stroke: white; }
+.leaflet-pane > svg.train-renderer .train-hit { pointer-events: stroke; cursor: pointer; }
+.train-renderer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.train-capsule, .train-wagons { pointer-events: none; }
+.train-outline { filter: drop-shadow(0 1px 2px #18263185); }
+.train-wagon { filter: drop-shadow(0 1px 1px #172b3c90); }
+.train-wagon-head { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 1px 1px #172b3c90); }
+.train-wagon-tail { filter: drop-shadow(0 0 2px #fa343e90) drop-shadow(0 1px 1px #172b3c90); }
+.train-visual:focus-visible { outline: none; }
+.train-visual:focus-visible .train-hit { stroke: #fff; stroke-opacity: 0.5; }
 .header-tools { display: flex; align-items: center; gap: 20px; }
 #moscow-clock { color: #777d70; font-size: 12px; font-variant-numeric: tabular-nums; }
 .lamp-swatch { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
@@ -285,4 +302,53 @@ body {
   #moscow-clock { display: none; }
   .header-tools { gap: 0; }
   .workspace { grid-template-columns: 1fr; }
+}
+
+/* Ночь меняет корпус и отдельный слой затемнения, исходные PNG не фильтруются. */
+:root[data-theme="night"] { color-scheme: dark; color: #e2e6e7; background: #151b20; }
+[data-theme="night"] body { background: linear-gradient(135deg, #293138, #171d22); }
+[data-theme="night"] .instrument-panel { background: linear-gradient(#323c44, #242d34); border-color: #47525b; box-shadow: inset 0 1px 0 #ffffff14, 0 2px 0 #101820, 0 12px 28px #0005; }
+[data-theme="night"] .panel-header { border-color: #151d23; box-shadow: 0 1px 0 #ffffff0b; }
+[data-theme="night"] .instrument-button { color: #e4e8e8; background: linear-gradient(#46535e, #2a353e); border-color: #52606a; box-shadow: inset 0 1px 0 #ffffff20, 0 2px 0 #15202a, 0 3px 4px #0004; }
+[data-theme="night"] .instrument-button:hover { background: linear-gradient(#55636f, #34414b); }
+[data-theme="night"] .instrument-button:active { background: #25323b; box-shadow: inset 0 2px 4px #0008; }
+[data-theme="night"] .inset-surface { background: #202c34; border-color: #485660; box-shadow: inset 0 2px 5px #0005, 0 1px 0 #ffffff0b; }
+[data-theme="night"] .map-frame { border-color: #53616b; }
+[data-theme="night"] .station-button { color: #d4dcdf; }
+[data-theme="night"] .station-button:hover { background: #3b4953; }
+[data-theme="night"] .station-button[aria-pressed="true"] { background: linear-gradient(#283844, #36444e); border-color: #667782; color: #fff; box-shadow: inset 0 1px 4px #0005; }
+[data-theme="night"] .station-list li::before { background: #657582; }
+[data-theme="night"] .brand p,
+[data-theme="night"] #moscow-clock,
+[data-theme="night"] .panel-footer,
+[data-theme="night"] .map-diagnostics,
+[data-theme="night"] .station-distance,
+[data-theme="night"] .departure-number,
+[data-theme="night"] .source-note,
+[data-theme="night"] .empty-departures,
+[data-theme="night"] .schedule-status,
+[data-theme="night"] .train-anchors,
+[data-theme="night"] .train-stops,
+[data-theme="night"] .unplaced-details { color: #afbbc3; }
+[data-theme="night"] .departures-group h3,
+[data-theme="night"] .motion-mode { color: #ccdadb; }
+[data-theme="night"] .departure-button,
+[data-theme="night"] .train-anchors { border-color: #495a65; }
+[data-theme="night"] .departure-button:hover { background: #344550; }
+[data-theme="night"] .map-legend,
+[data-theme="night"] .train-counter,
+[data-theme="night"] .station-tooltip { color: #e0e7eb; background: #26343eee; border-color: #6c7a83; box-shadow: 0 2px 6px #0005; }
+[data-theme="night"] .leaflet-control-attribution,
+[data-theme="night"] .leaflet-control-scale-line { background: #26343ee8; color: #d5e0e4; border-color: #8b9da8; }
+[data-theme="night"] .leaflet-control-attribution a { color: #c0d6df; }
+[data-theme="night"] .train-capsule { filter: drop-shadow(0 0 3px #fff0d5) drop-shadow(0 0 7px #ffdfa280); }
+[data-theme="night"] .train-body { stroke: #fff0d5; }
+[data-theme="night"] .train-outline { stroke: #e4d5b4; stroke-width: 10; filter: none; }
+[data-theme="night"] .train-capsule .train-head,
+[data-theme="night"] .train-capsule .train-tail { fill: #fff0d5; filter: none; }
+[data-theme="night"] .train-wagon-head { filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 7px #fff9); }
+[data-theme="night"] .train-wagon-tail { filter: drop-shadow(0 0 4px #fa343e) drop-shadow(0 0 7px #fa343e99); }
+@media (max-width: 1100px) {
+  .header-tools { gap: 8px; }
+  #moscow-clock { display: none; }
 }

@@ -5,28 +5,43 @@
     "tileProvider": "thunderforest",
     "tileStyle": "transport",
     "corridorBufferMeters": 500,
-    "minZoom": 12,
+    "minZoom": 9,
     "maxZoom": 18,
     "overviewMaxZoom": 14,
+    "stationFocusZoom": 15,
     "navigationPadding": 0.2,
     "dimmingOpacity": 0.16,
-    "diameterColors": { "1": "#ED9F2D", "2": "#DF477C", "3": "#E15D29", "4": "#3CB183" }
+    "nightDimmingOpacity": 0.68,
+    "diameterColors": { "1": "#ED9F2D", "2": "#DF477C", "3": "#E15D29", "4": "#3CB183" },
+    "trainRendering": {
+      "spriteMinZoom": 14,
+      "nightSpriteMinZoom": 15,
+      "wagonCount": 6,
+      "wagonWidthPx": 10,
+      "wagonGapMeters": 3,
+      "directionOffsetPx": 8
+    }
   },
   "motion": {
     "anchorField": "departureTime",
     "trainLengthMeters": 160,
     "dwellSeconds": 30,
     "terminalDwellSeconds": 120,
-    "fallbackSpeedKmh": 60
+    "fallbackSpeedKmh": 75,
+    "edgeFadeSeconds": 30,
+    "coverageExitStationIds": ["nakhabino", "podolsk"],
+    "exitRules": [
+      { "destinationAliases": ["Рижский вокзал", "Москва-Рижская", "Москва Рижская", "Москва (Рижский вокзал)"], "afterStationId": "dmitrovskaya", "direction": 1, "fadeSeconds": 30 }
+    ]
   },
   "collector": {
     "baseUrl": "https://mcd.nata-info.ru",
     "build": 84,
     "minRequestIntervalMs": 1000,
-    "cyclePauseSeconds": 120,
+    "cyclePauseSeconds": 300,
     "requestTimeoutSeconds": 20,
-    "tripMatchWindowSeconds": 1800,
+    "tripMatchWindowSeconds": 10800,
     "historyRetentionHours": 36
   },
-  "client": { "snapshotPollIntervalMs": 5000 }
+  "client": { "snapshotPollIntervalMs": 5000, "stationDeparturesPerDirection": 3 }
 }

@@ -1,22 +1,14 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 1,
   "updatedAt": "2026-10-07",
   "timezone": "Europe/Moscow",
   "source": "Пользовательский TSV; координаты Покровского уточнены пользователем, ID проверен в /api/stations",
+  "status": "catalog-imported",
   "section": {
     "diameter": 2,
     "startStationId": "nakhabino",
     "endStationId": "podolsk",
-    "directionPivotStationId": "kurskaya",
-    "id": "d2-nakhabino-podolsk",
-    "geometryFile": "railway.geojson",
-    "geometryStatus": "connected-and-station-alignment-checked",
-    "distanceUnit": "meters",
-    "geometryRole": "representative-path-for-both-directions",
-    "geometryLengthMeters": 81536.651,
-    "stationSpanMeters": 79959.873,
-    "geometryExtensionBeforeMeters": 794.177,
-    "geometryExtensionAfterMeters": 782.601
+    "directionPivotStationId": "kurskaya"
   },
   "pollStationApiIds": [
     4139,
@@ -55,14 +47,7 @@
       },
       "order": 0,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 794.177,
-      "trackLocation": {
-        "longitude": 37.18484043054917,
-        "latitude": 55.84162923866597
-      },
-      "trackOffsetMeters": 6.01
+      "aliases": []
     },
     {
       "id": "anikeevka",
@@ -75,14 +60,7 @@
       },
       "order": 1,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 3180.034,
-      "trackLocation": {
-        "longitude": 37.21915955653835,
-        "latitude": 55.832305620243275
-      },
-      "trackOffsetMeters": 0.305
+      "aliases": []
     },
     {
       "id": "opalikha",
@@ -95,14 +73,7 @@
       },
       "order": 2,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 5315.495,
-      "trackLocation": {
-        "longitude": 37.24870435495206,
-        "latitude": 55.82264231370282
-      },
-      "trackOffsetMeters": 7.897
+      "aliases": []
     },
     {
       "id": "krasnogorskaya",
@@ -115,14 +86,7 @@
       },
       "order": 3,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 9456.712,
-      "trackLocation": {
-        "longitude": 37.30393460209458,
-        "latitude": 55.814329638572886
-      },
-      "trackOffsetMeters": 1.417
+      "aliases": []
     },
     {
       "id": "pavshino",
@@ -135,14 +99,7 @@
       },
       "order": 4,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 11960.731,
-      "trackLocation": {
-        "longitude": 37.34146437057009,
-        "latitude": 55.81513588593267
-      },
-      "trackOffsetMeters": 4.729
+      "aliases": []
     },
     {
       "id": "penyagino",
@@ -155,14 +112,7 @@
       },
       "order": 5,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 13548.834,
-      "trackLocation": {
-        "longitude": 37.36116740417997,
-        "latitude": 55.82252810798566
-      },
-      "trackOffsetMeters": 7.105
+      "aliases": []
     },
     {
       "id": "volokolamskaya",
@@ -175,14 +125,7 @@
       },
       "order": 6,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 15480.546,
-      "trackLocation": {
-        "longitude": 37.38303154291858,
-        "latitude": 55.832109326944504
-      },
-      "trackOffsetMeters": 6.989
+      "aliases": []
     },
     {
       "id": "trikotazhnaya",
@@ -195,14 +138,7 @@
       },
       "order": 7,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 16521.015,
-      "trackLocation": {
-        "longitude": 37.39896464102888,
-        "latitude": 55.83311983309917
-      },
-      "trackOffsetMeters": 2.103
+      "aliases": []
     },
     {
       "id": "tushinskaya",
@@ -215,14 +151,7 @@
       },
       "order": 8,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 19274.362,
-      "trackLocation": {
-        "longitude": 37.44020301869753,
-        "latitude": 55.827279406767246
-      },
-      "trackOffsetMeters": 7.806
+      "aliases": []
     },
     {
       "id": "shchukinskaya",
@@ -235,14 +164,7 @@
       },
       "order": 9,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 21901.271,
-      "trackLocation": {
-        "longitude": 37.46039460036087,
-        "latitude": 55.81112756200362
-      },
-      "trackOffsetMeters": 8.082
+      "aliases": []
     },
     {
       "id": "streshnevo",
@@ -255,14 +177,7 @@
       },
       "order": 10,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 23853.288,
-      "trackLocation": {
-        "longitude": 37.48995062764703,
-        "latitude": 55.81521667501997
-      },
-      "trackOffsetMeters": 1.595
+      "aliases": []
     },
     {
       "id": "krasny-baltiets",
@@ -275,14 +190,7 @@
       },
       "order": 11,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 26146.721,
-      "trackLocation": {
-        "longitude": 37.52658964096167,
-        "latitude": 55.815509015389146
-      },
-      "trackOffsetMeters": 1.337
+      "aliases": []
     },
     {
       "id": "grazhdanskaya",
@@ -295,14 +203,7 @@
       },
       "order": 12,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 28235.795,
-      "trackLocation": {
-        "longitude": 37.55326811745585,
-        "latitude": 55.80552093084368
-      },
-      "trackOffsetMeters": 2.943
+      "aliases": []
     },
     {
       "id": "dmitrovskaya",
@@ -315,14 +216,7 @@
       },
       "order": 13,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 29868.482,
-      "trackLocation": {
-        "longitude": 37.5784548186362,
-        "latitude": 55.80794869167105
-      },
-      "trackOffsetMeters": 2.126
+      "aliases": []
     },
     {
       "id": "maryina-roshcha",
@@ -335,14 +229,7 @@
       },
       "order": 14,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 32812.78,
-      "trackLocation": {
-        "longitude": 37.619903465864866,
-        "latitude": 55.80103327328676
-      },
-      "trackOffsetMeters": 6.214
+      "aliases": []
     },
     {
       "id": "rizhskaya",
@@ -355,14 +242,7 @@
       },
       "order": 15,
       "directionZone": "north",
-      "aliases": [],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 34423.755,
-      "trackLocation": {
-        "longitude": 37.63957223231722,
-        "latitude": 55.79327184669334
-      },
-      "trackOffsetMeters": 7.135
+      "aliases": []
     },
     {
       "id": "ploshchad-trekh-vokzalov",
@@ -378,14 +258,7 @@
       "aliases": [
         "Каланчёвская",
         "Каланчевская"
-      ],
-      "apiToMoscowDirectionStep": 1,
-      "alongTrackMeters": 36446.912,
-      "trackLocation": {
-        "longitude": 37.651297964530805,
-        "latitude": 55.776686478404336
-      },
-      "trackOffsetMeters": 12.727
+      ]
     },
     {
       "id": "kurskaya",
@@ -398,14 +271,7 @@
       },
       "order": 17,
       "directionZone": "pivot",
-      "aliases": [],
-      "apiToMoscowDirectionStep": null,
-      "alongTrackMeters": 38574.637,
-      "trackLocation": {
-        "longitude": 37.66211271660916,
-        "latitude": 55.75860178390568
-      },
-      "trackOffsetMeters": 7.765
+      "aliases": []
     },
     {
       "id": "moskva-tovarnaya",
@@ -418,14 +284,7 @@
       },
       "order": 18,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 40902.732,
-      "trackLocation": {
-        "longitude": 37.688248440245935,
-        "latitude": 55.7456134938617
-      },
-      "trackOffsetMeters": 6.31
+      "aliases": []
     },
     {
       "id": "kalitniki",
@@ -438,14 +297,7 @@
       },
       "order": 19,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 42478.418,
-      "trackLocation": {
-        "longitude": 37.7020211199414,
-        "latitude": 55.73416627614049
-      },
-      "trackOffsetMeters": 3.416
+      "aliases": []
     },
     {
       "id": "novokhokhlovskaya",
@@ -458,14 +310,7 @@
       },
       "order": 20,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 43755.328,
-      "trackLocation": {
-        "longitude": 37.71328925494475,
-        "latitude": 55.72460040260591
-      },
-      "trackOffsetMeters": 4.071
+      "aliases": []
     },
     {
       "id": "tekstilshchiki",
@@ -478,14 +323,7 @@
       },
       "order": 21,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 45978.742,
-      "trackLocation": {
-        "longitude": 37.72950859549319,
-        "latitude": 55.70729086492003
-      },
-      "trackOffsetMeters": 0.339
+      "aliases": []
     },
     {
       "id": "pechatniki",
@@ -498,14 +336,7 @@
       },
       "order": 22,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 47602.11,
-      "trackLocation": {
-        "longitude": 37.73217953367521,
-        "latitude": 55.69281642180295
-      },
-      "trackOffsetMeters": 0.5
+      "aliases": []
     },
     {
       "id": "lyublino",
@@ -520,14 +351,7 @@
       "directionZone": "south",
       "aliases": [
         "Кубанская"
-      ],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 48505.993,
-      "trackLocation": {
-        "longitude": 37.73368405837461,
-        "latitude": 55.68506072150938
-      },
-      "trackOffsetMeters": 14.111
+      ]
     },
     {
       "id": "depo",
@@ -540,14 +364,7 @@
       },
       "order": 24,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 49773.869,
-      "trackLocation": {
-        "longitude": 37.728006792674385,
-        "latitude": 55.67413113543979
-      },
-      "trackOffsetMeters": 3.82
+      "aliases": []
     },
     {
       "id": "pererva",
@@ -560,14 +377,7 @@
       },
       "order": 25,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 51363.66,
-      "trackLocation": {
-        "longitude": 37.71698144584752,
-        "latitude": 55.66142402602779
-      },
-      "trackOffsetMeters": 1.299
+      "aliases": []
     },
     {
       "id": "kuryanovo",
@@ -580,14 +390,7 @@
       },
       "order": 26,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 52978.09,
-      "trackLocation": {
-        "longitude": 37.701330438572796,
-        "latitude": 55.64990220213843
-      },
-      "trackOffsetMeters": 8.532
+      "aliases": []
     },
     {
       "id": "moskvorechye",
@@ -600,14 +403,7 @@
       },
       "order": 27,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 54290.366,
-      "trackLocation": {
-        "longitude": 37.68910055362679,
-        "latitude": 55.64039265929216
-      },
-      "trackOffsetMeters": 0.759
+      "aliases": []
     },
     {
       "id": "tsaritsyno",
@@ -620,14 +416,7 @@
       },
       "order": 28,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 57091.294,
-      "trackLocation": {
-        "longitude": 37.6685510435792,
-        "latitude": 55.61862924369979
-      },
-      "trackOffsetMeters": 20.131
+      "aliases": []
     },
     {
       "id": "pokrovskoe",
@@ -640,14 +429,7 @@
       },
       "order": 29,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 60076.695,
-      "trackLocation": {
-        "longitude": 37.63210793355466,
-        "latitude": 55.602970393600934
-      },
-      "trackOffsetMeters": 6.21
+      "aliases": []
     },
     {
       "id": "krasny-stroitel",
@@ -660,14 +442,7 @@
       },
       "order": 30,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 61939.785,
-      "trackLocation": {
-        "longitude": 37.61506407749313,
-        "latitude": 55.58975530005649
-      },
-      "trackOffsetMeters": 0.887
+      "aliases": []
     },
     {
       "id": "bittsa",
@@ -680,14 +455,7 @@
       },
       "order": 31,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 64025.244,
-      "trackLocation": {
-        "longitude": 37.61143866247366,
-        "latitude": 55.571186017407165
-      },
-      "trackOffsetMeters": 1.936
+      "aliases": []
     },
     {
       "id": "butovo",
@@ -700,14 +468,7 @@
       },
       "order": 32,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 68270.283,
-      "trackLocation": {
-        "longitude": 37.57062789607999,
-        "latitude": 55.54170490530351
-      },
-      "trackOffsetMeters": 3.447
+      "aliases": []
     },
     {
       "id": "shcherbinka",
@@ -720,14 +481,7 @@
       },
       "order": 33,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 71819.186,
-      "trackLocation": {
-        "longitude": 37.562159113889,
-        "latitude": 55.51016253360691
-      },
-      "trackOffsetMeters": 2.418
+      "aliases": []
     },
     {
       "id": "ostafyevo",
@@ -740,14 +494,7 @@
       },
       "order": 34,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 74541.318,
-      "trackLocation": {
-        "longitude": 37.55493931940351,
-        "latitude": 55.486033547559494
-      },
-      "trackOffsetMeters": 14.073
+      "aliases": []
     },
     {
       "id": "silikatnaya",
@@ -760,14 +507,7 @@
       },
       "order": 35,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 76279.05,
-      "trackLocation": {
-        "longitude": 37.55540990866329,
-        "latitude": 55.470457340560145
-      },
-      "trackOffsetMeters": 2.911
+      "aliases": []
     },
     {
       "id": "podolsk",
@@ -780,14 +520,7 @@
       },
       "order": 36,
       "directionZone": "south",
-      "aliases": [],
-      "apiToMoscowDirectionStep": -1,
-      "alongTrackMeters": 80754.05,
-      "trackLocation": {
-        "longitude": 37.56524478522743,
-        "latitude": 55.43166196488898
-      },
-      "trackOffsetMeters": 9.541
+      "aliases": []
     }
   ]
 }

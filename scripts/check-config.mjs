@@ -7,14 +7,14 @@ const railway = await readJson('../config/railway.geojson');
 const app = await readJson('../config/app.json');
 
 // Проверяем восстановление переданных данных, включая единицы и соответствие расстояний.
-assert.equal(stations.stations.length, 5);
-assert.deepEqual(stations.pollStationApiIds, [4127, 4128, 4129]);
-assert.deepEqual(stations.stations.filter((s) => s.pollEnabled).map((s) => s.apiStationId).sort(), [4127, 4128, 4129]);
+assert.equal(stations.stations.length, 37);
+assert.equal(stations.pollStationApiIds.length, 23);
+assert.deepEqual(stations.stations.filter((s) => s.pollEnabled).map((s) => s.apiStationId).sort(), [...stations.pollStationApiIds].sort());
 assert.equal(railway.type, 'FeatureCollection');
 assert.equal(railway.features.length, 1);
 const { geometry, properties } = railway.features[0];
 assert.equal(geometry.type, 'LineString');
-assert.equal(geometry.coordinates.length, 165);
+assert(geometry.coordinates.length >= 1312);
 assert.equal(properties.cumulativeMeters.length, geometry.coordinates.length);
 assert.equal(properties.cumulativeMeters[0], 0);
 assert.equal(properties.cumulativeMeters.at(-1), stations.section.geometryLengthMeters);
@@ -39,7 +39,8 @@ for (let i = 0; i < geometry.coordinates.length; i++) {
 }
 for (const [index, station] of stations.stations.entries()) {
   assert.equal(station.order, index);
-  assert(station.alongTrackMeters > 0 && station.alongTrackMeters < total);
+  assert(station.alongTrackMeters >= 0 && station.alongTrackMeters <= total + 0.001);
+  assert.equal(station.apiToMoscowDirectionStep, station.directionZone === 'north' ? 1 : station.directionZone === 'south' ? -1 : null);
   if (index > 0) assert(station.alongTrackMeters > stations.stations[index - 1].alongTrackMeters);
   assert(Math.abs(distance(
     [station.location.longitude, station.location.latitude],
@@ -49,5 +50,25 @@ for (const [index, station] of stations.stations.entries()) {
 assert.equal(app.timezone, stations.timezone);
 assert.equal(app.motion.anchorField, 'departureTime');
 assert(app.collector.minRequestIntervalMs >= 1000);
-assert(app.collector.cyclePauseSeconds >= 120);
-console.log(`Конфиги проверены: 5 станций, 165 вершин, ${total.toFixed(3)} м.`);
+assert(app.collector.cyclePauseSeconds >= 300);
+assert.equal(app.map.trainRendering.wagonCount, 6);
+assert.equal(app.map.trainRendering.spriteMinZoom, 14);
+assert.equal(app.map.trainRendering.nightSpriteMinZoom, 15);
+assert(app.map.nightDimmingOpacity > app.map.dimmingOpacity);
+const fadeCoverage = app.motion.fallbackSpeedKmh / 3.6 * app.motion.edgeFadeSeconds + app.motion.trainLengthMeters / 2;
+assert(stations.section.geometryExtensionBeforeMeters > fadeCoverage);
+assert(stations.section.geometryExtensionAfterMeters > fadeCoverage);
+const fullD2 = await readJson('../config/d2-stations.json');
+assert.equal(fullD2.stations.length, 37);
+assert.equal(fullD2.pollStationApiIds.length, 23);
+assert.equal(new Set(fullD2.stations.map((station) => station.id)).size, fullD2.stations.length);
+assert.equal(new Set(fullD2.pollStationApiIds).size, fullD2.pollStationApiIds.length);
+assert.equal(fullD2.stations[0].id, 'nakhabino');
+assert.equal(fullD2.stations.at(-1).id, 'podolsk');
+for (const [order, station] of fullD2.stations.entries()) {
+  assert.equal(station.order, order);
+  assert(station.location.latitude > 55.4 && station.location.latitude < 55.9);
+  assert(station.location.longitude > 37.1 && station.location.longitude < 37.8);
+  if (order > 0) assert.notDeepEqual(station.location, fullD2.stations[order - 1].location, 'У соседних станций одинаковые координаты');
+}
+console.log(`D2 проверен: ${stations.stations.length} станций, ${stations.pollStationApiIds.length} ID API, ${geometry.coordinates.length} вершин, ${total.toFixed(3)} м.`);

@@ -23,6 +23,21 @@ $history = mergeObservations($history, [$missing], $stationA, isoNow(), 1800);
 $history = mergeObservations($history, [$missing], $stationB, isoNow(), 1800);
 check(count(array_filter($history, static fn($o) => $o['runId'] === null)) === 2, 'Без номера нет объединения станций');
 check(timestampOf('2026-10-07T12:34:30') === null, 'Часовой пояс обязателен');
+$north = ['id' => 'north', 'apiToMoscowDirectionStep' => 1];
+$south = ['id' => 'south', 'apiToMoscowDirectionStep' => -1];
+$crossing = mergeObservations([], [$record], $north, isoNow(), 10800);
+$crossing = mergeObservations($crossing, [array_merge($record, ['toMoscow' => false, 'departureTime' => '2026-10-08T01:00:30+03:00'])], $south, isoNow(), 10800);
+check(count(array_unique(array_column($crossing, 'runId'))) === 1, 'Смена toMoscow через Курскую сохраняет рейс');
+check(array_unique(array_column($crossing, 'travelDirection')) === [1], 'Направление вдоль геометрии устойчиво');
+$crossing = mergeObservations($crossing, [array_merge($record, ['toMoscow' => true, 'departureTime' => '2026-10-08T01:00:30+03:00'])], $south, isoNow(), 10800);
+check(count(array_unique(array_column($crossing, 'runId'))) === 2, 'Встречный рейс на юге не объединяется');
+$repeated = mergeObservations([], [$record], $north, isoNow(), 10800);
+$repeated = mergeObservations($repeated, [array_merge($record, ['departureTime' => '2026-10-08T01:00:30+03:00'])], $north, isoNow(), 10800);
+check(count(array_unique(array_column($repeated, 'runId'))) === 2, 'Повтор номера на той же станции не склеивается в трёхчасовом окне');
+$delayed = array_merge($record, ['scheduleTime' => $record['departureTime']]);
+$same = mergeObservations([], [$delayed], $north, isoNow(), 10800);
+$same = mergeObservations($same, [array_merge($delayed, ['departureTime' => '2026-10-08T01:00:30+03:00'])], $north, isoNow(), 10800);
+check(count($same) === 1, 'Уточнение задержки сохраняет идентичность по плановому времени');
 $normalized = normalizeStation(['stationId' => 4127, 'trains' => [[
     'trainNo' => null, 'toMoscow' => true, 'departureTime' => 'bad', 'equipment' => 'private',
     'i18n' => ['ru' => ['destination' => '<b>Текст</b>', 'trainClass' => ['name' => 'Новый тип'], 'stops' => 'Исходный текст']],

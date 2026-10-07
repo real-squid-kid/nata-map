@@ -14,8 +14,8 @@ app.style.setProperty('--diameter-color', diameterColor);
 app.innerHTML = `
   <section class="instrument-panel map-panel">
     <header class="panel-header">
-      <div class="brand"><span class="diameter-badge">D2</span><div><h1>nata-map</h1><p>Стрешнево — Марьина Роща</p></div></div>
-      <div class="header-tools"><time id="moscow-clock"></time><button type="button" class="instrument-button overview-button" id="overview">Весь участок</button></div>
+      <div class="brand"><span class="diameter-badge">D2</span><div><h1>nata-map</h1><p>Нахабино — Подольск</p></div></div>
+      <div class="header-tools"><time id="moscow-clock"></time><button type="button" class="instrument-button theme-button" id="theme-toggle" aria-pressed="false">Ночной режим</button><button type="button" class="instrument-button overview-button" id="overview">Весь диаметр</button></div>
     </header>
     <div class="workspace">
       <section class="map-frame" aria-label="Карта участка D2">
@@ -23,16 +23,20 @@ app.innerHTML = `
         <div class="map-toolbar" role="group" aria-label="Масштаб карты">
           <button type="button" class="instrument-button zoom-button" id="zoom-in" aria-label="Приблизить">+</button>
           <button type="button" class="instrument-button zoom-button" id="zoom-out" aria-label="Отдалить">−</button>
+          <button type="button" class="instrument-button fullscreen-button" id="fullscreen" aria-label="Развернуть карту" aria-pressed="false">⛶</button>
         </div>
         <div class="map-legend"><span class="route-swatch"></span><span>D2</span><span class="lamp-swatch head-swatch"></span><span>Голова</span><span class="lamp-swatch tail-swatch"></span><span>Хвост</span></div>
         <div class="train-counter"><span id="active-trains">0</span> поездов на карте</div>
       </section>
       <aside class="sidebar" aria-label="Станции и сведения">
-        <section class="stations-section">
-          <h2 class="section-heading">Станции <span>5</span></h2>
+        <details class="stations-section" id="stations-section" open>
+          <summary class="section-heading">Станции <span>${stationsConfig.stations.length}</span></summary>
           <ol id="station-list" class="station-list"></ol>
-        </section>
-        <section id="station-details" class="inset-surface station-details" aria-live="polite"></section>
+        </details>
+        <details id="schedule-section" class="inset-surface schedule-section" open>
+          <summary>Расписание</summary>
+          <section id="station-details" class="station-details" aria-live="polite"></section>
+        </details>
         <section id="train-details" class="inset-surface train-details" aria-live="polite" hidden></section>
         <details id="unplaced-details" class="unplaced-details" hidden><summary id="unplaced-summary"></summary><div id="unplaced-list"></div></details>
         <details class="map-diagnostics">
@@ -40,7 +44,9 @@ app.innerHTML = `
           <dl>
             <div><dt>Масштаб</dt><dd id="zoom-value">—</dd></div>
             <div><dt>Коридор</dt><dd>500 м</dd></div>
-            <div><dt>Запрошено тайлов</dt><dd id="tiles-requested">0</dd></div>
+            <div><dt>Запросов к Thunderforest</dt><dd id="tiles-requested">0</dd></div>
+            <div><dt>Из локального кэша</dt><dd id="tiles-cached">0</dd></div>
+            <div><dt>Ожидают загрузки</dt><dd id="tiles-pending">0</dd></div>
             <div><dt>Вне коридора, без запросов</dt><dd id="tiles-blocked">0</dd></div>
             <div><dt>Загружено</dt><dd id="tiles-loaded">0</dd></div>
             <div><dt>Ошибок</dt><dd id="tiles-failed">0</dd></div>
@@ -81,8 +87,8 @@ function showTrain(trip) {
 }
 
 function showRecord(record, station) {
-  const trip = model.trips.find((candidate) => candidate.trainNo === record.trainNo && candidate.toMoscow === record.toMoscow
-    && candidate.anchors.some((anchor) => anchor.stationId === station.id && anchor.departureTime === record.departureTime));
+  const trip = model.trips.find((candidate) => candidate.trainNo === record.trainNo
+    && candidate.anchors.some((anchor) => anchor.stationId === station.id && anchor.toMoscow === record.toMoscow && anchor.departureTime === record.departureTime));
   if (trip) showTrain(trip);
   else { selectedTrain = { record, station }; renderTrainDetails(); }
 }
@@ -94,7 +100,7 @@ function renderStationDetails() {
   const heading = element('h2', station.name);
   const nodes = [heading];
   if (!station.pollEnabled) {
-    nodes.push(element('p', 'Данные расписания для MVP не подключены.', 'schedule-status'));
+    nodes.push(element('p', 'Источник расписания для этой станции не подключён.', 'schedule-status'));
   } else {
     const state = snapshot.stations[station.id];
     const status = !state?.lastSuccessfulAt ? (state?.error ? 'Расписание недоступно.' : 'Ожидание первого расписания.')
@@ -106,8 +112,8 @@ function renderStationDetails() {
       const group = element('section', undefined, 'departures-group');
       group.append(element('h3', label));
       const departures = (state?.trains || []).filter((train) => train.toMoscow === direction
-        && (!Number.isFinite(parseTime(train.departureTime)) || parseTime(train.departureTime) + 15000 >= Date.now()))
-        .sort((a, b) => (parseTime(a.departureTime) || Infinity) - (parseTime(b.departureTime) || Infinity)).slice(0, 10);
+        && Number.isFinite(parseTime(train.departureTime)) && parseTime(train.departureTime) + 15000 >= Date.now())
+        .sort((a, b) => parseTime(a.departureTime) - parseTime(b.departureTime)).slice(0, appConfig.client.stationDeparturesPerDirection);
       if (!departures.length) group.append(element('p', state?.lastSuccessfulAt ? 'Нет ближайших отправлений.' : 'Нет данных.', 'empty-departures'));
       for (const train of departures) {
         const button = element('button', undefined, 'departure-button');
@@ -141,6 +147,15 @@ function selectStation(station, pan = true) {
   sectionMap?.selectStation(station, { pan });
 }
 
+function directionLabel(trip, record) {
+  const pivot = stationsConfig.stations.find((station) => station.id === stationsConfig.section.directionPivotStationId);
+  if (!trip || !pivot) return record.toMoscow ? 'В Москву' : 'Из Москвы';
+  const now = Date.now();
+  const position = getTrainPosition(trip, now, stationsConfig.stations, appConfig.motion, stationsConfig.section.geometryLengthMeters);
+  const after = trip.direction * (position.centerMeters - pivot.alongTrackMeters);
+  return after <= 0.001 ? 'В Москву' : 'Из Москвы';
+}
+
 function renderTrainDetails() {
   const details = document.querySelector('#train-details');
   if (!selectedTrain) { details.hidden = true; return; }
@@ -156,7 +171,7 @@ function renderTrainDetails() {
   header.append(close);
   const nodes = [header, element('p', record.destination || 'Конечная неизвестна', 'train-destination'),
     element('p', record.trainClass || 'Тип неизвестен', 'station-distance')];
-  if (typeof record.toMoscow === 'boolean') nodes.push(element('p', record.toMoscow ? 'В Москву' : 'Из Москвы', 'station-distance'));
+  if (typeof record.toMoscow === 'boolean') nodes.push(element('p', directionLabel(trip, record), 'train-direction station-distance'));
   if (trip) {
     const position = getTrainPosition(trip, Date.now(), stationsConfig.stations, appConfig.motion, stationsConfig.section.geometryLengthMeters);
     nodes.push(element('p', position.visible ? motionLabels[position.mode] : 'Вне участка', 'motion-mode'));
@@ -209,7 +224,9 @@ function renderStats(stats) {
   cancelAnimationFrame(statsFrame);
   statsFrame = requestAnimationFrame(() => {
     for (const key of ['requested', 'blocked', 'loaded', 'failed']) document.querySelector(`#tiles-${key}`).textContent = stats[key];
-    const pending = stats.requested - stats.loaded - stats.failed;
+    document.querySelector('#tiles-cached').textContent = stats.cacheHits;
+    document.querySelector('#tiles-pending').textContent = stats.pending;
+    const pending = stats.pending;
     document.querySelector('#tile-status').textContent = !apiKey ? 'Подложка не подключена'
       : pending > 0 ? 'Загрузка подложки…' : stats.failed > 0 ? (stats.loaded > 0 ? 'Часть подложки не загрузилась' : 'Подложка недоступна')
       : stats.loaded > 0 ? 'Подложка загружена' : 'Серый фон вне коридора';
@@ -228,9 +245,48 @@ sectionMap = createSectionMap({
   },
 });
 selectStation(selectedStation, false);
+let night = false;
+try { night = localStorage.getItem('nata-map-theme') === 'night'; } catch { /* Локальные настройки необязательны. */ }
+function applyTheme() {
+  document.documentElement.dataset.theme = night ? 'night' : 'day';
+  sectionMap.setNight(night);
+  const button = document.querySelector('#theme-toggle');
+  button.setAttribute('aria-pressed', String(night));
+  button.textContent = night ? 'Дневной режим' : 'Ночной режим';
+}
+applyTheme();
+document.querySelector('#theme-toggle').addEventListener('click', () => {
+  night = !night; applyTheme();
+  try { localStorage.setItem('nata-map-theme', night ? 'night' : 'day'); } catch { /* Сохраняем режим текущей вкладки. */ }
+});
 document.querySelector('#overview').addEventListener('click', sectionMap.fitSection);
 document.querySelector('#zoom-in').addEventListener('click', sectionMap.zoomIn);
 document.querySelector('#zoom-out').addEventListener('click', sectionMap.zoomOut);
+
+const mapFrame = document.querySelector('.map-frame');
+const fullscreenButton = document.querySelector('#fullscreen');
+function updateFullscreen() {
+  const expanded = document.fullscreenElement === mapFrame || mapFrame.classList.contains('is-expanded');
+  fullscreenButton.setAttribute('aria-pressed', String(expanded));
+  fullscreenButton.setAttribute('aria-label', expanded ? 'Вернуть карту в окно' : 'Развернуть карту');
+}
+async function toggleFullscreen() {
+  if (document.fullscreenElement === mapFrame) await document.exitFullscreen();
+  else if (mapFrame.classList.contains('is-expanded')) mapFrame.classList.remove('is-expanded');
+  else {
+    try {
+      if (!mapFrame.requestFullscreen) throw new Error('Fullscreen API недоступен');
+      await mapFrame.requestFullscreen();
+    } catch { mapFrame.classList.add('is-expanded'); }
+  }
+  updateFullscreen();
+}
+function exitExpanded(event) {
+  if (event.key === 'Escape') { mapFrame.classList.remove('is-expanded'); updateFullscreen(); }
+}
+fullscreenButton.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', updateFullscreen);
+document.addEventListener('keydown', exitExpanded);
 
 const stopPolling = startSnapshotPolling({
   intervalMs: appConfig.client.snapshotPollIntervalMs,
@@ -250,10 +306,12 @@ function renderSourceStatus() {
   const successful = Object.values(snapshot.stations).filter((station) => station.lastSuccessfulAt);
   const errors = Object.values(snapshot.stations).filter((station) => station.error || station.needReload);
   const latest = successful.map((station) => parseTime(station.lastSuccessfulAt)).sort((a, b) => a - b)[0];
-  const stale = Date.now() - (parseTime(snapshot.publishedAt) || 0) > 240000;
+  const cycleBudgetMs = (appConfig.collector.cyclePauseSeconds
+    + stationsConfig.pollStationApiIds.length * (appConfig.collector.requestTimeoutSeconds + appConfig.collector.minRequestIntervalMs / 1000) + 60) * 1000;
+  const stale = Date.now() - (parseTime(snapshot.publishedAt) || 0) > cycleBudgetMs;
   document.querySelector('#source-status').textContent = !successful.length
     ? (localError ? 'Локальное расписание недоступно' : 'Ожидание расписания от сборщика')
-    : `${localError || errors.length || stale ? 'Последние данные' : 'Обновлено'} ${formatTime(latest)} · ${successful.length}/3 станции`;
+    : `${localError || errors.length || stale ? 'Последние данные' : 'Обновлено'} ${formatTime(latest)} · ${successful.length}/${stationsConfig.pollStationApiIds.length} станции`;
 }
 
 let frame;
@@ -279,6 +337,7 @@ function updateClock() {
     if (trip && mode) {
       const position = getTrainPosition(trip, Date.now(), stationsConfig.stations, appConfig.motion, stationsConfig.section.geometryLengthMeters);
       mode.textContent = position.visible ? motionLabels[position.mode] : 'Вне участка';
+      document.querySelector('#train-details .train-direction').textContent = directionLabel(trip, trip);
     }
   }
 }
@@ -288,4 +347,6 @@ document.addEventListener('visibilitychange', updateClock);
 if (import.meta.hot) import.meta.hot.dispose(() => {
   stopPolling(); cancelAnimationFrame(statsFrame); cancelAnimationFrame(frame); clearInterval(clockTimer);
   document.removeEventListener('visibilitychange', updateClock); sectionMap.destroy();
+  document.removeEventListener('fullscreenchange', updateFullscreen);
+  document.removeEventListener('keydown', exitExpanded);
 });
