@@ -4,7 +4,13 @@
   "map": {
     "tileProvider": "thunderforest",
     "tileStyle": "transport",
-    "corridorBufferMeters": 500
+    "corridorBufferMeters": 500,
+    "minZoom": 12,
+    "maxZoom": 18,
+    "overviewMaxZoom": 14,
+    "navigationPadding": 0.2,
+    "dimmingOpacity": 0.16,
+    "diameterColors": { "1": "#ED9F2D", "2": "#DF477C", "3": "#E15D29", "4": "#3CB183" }
   },
   "motion": {
     "anchorField": "departureTime",
@@ -17,7 +23,10 @@
     "baseUrl": "https://mcd.nata-info.ru",
     "build": 84,
     "minRequestIntervalMs": 1000,
-    "cyclePauseSeconds": 120
+    "cyclePauseSeconds": 120,
+    "requestTimeoutSeconds": 20,
+    "tripMatchWindowSeconds": 1800,
+    "historyRetentionHours": 36
   },
   "client": { "snapshotPollIntervalMs": 5000 }
 }

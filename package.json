@@ -9,6 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check-config.mjs",
+    "test": "node --test scripts/corridor.test.mjs scripts/motion.test.mjs",
+    "test:server": "php scripts/server.test.php",
+    "collect": "php server/collector.php",
+    "collect:once": "php server/collector.php --once",
     "server": "php -S 127.0.0.1:8080 -t server server/router.php"
   },
   "dependencies": { "leaflet": "1.9.4" },
