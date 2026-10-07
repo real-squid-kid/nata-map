@@ -24,10 +24,10 @@ app.innerHTML = `
         <div class="map-toolbar" role="group" aria-label="Масштаб карты">
           <button type="button" class="instrument-button zoom-button" id="zoom-in" aria-label="Приблизить">+</button>
           <button type="button" class="instrument-button zoom-button" id="zoom-out" aria-label="Отдалить">−</button>
-          <button type="button" class="instrument-button fullscreen-button" id="fullscreen" aria-label="Развернуть карту" aria-pressed="false">⛶</button>
+          <button type="button" class="instrument-button fullscreen-button" id="fullscreen" aria-label="Развернуть карту" aria-pressed="false"><span aria-hidden="true">⛶</span><span class="fullscreen-label">На весь экран</span></button>
         </div>
         <div class="map-legend"><span class="route-swatch"></span><span>D2</span><span class="lamp-swatch head-swatch"></span><span>Голова</span><span class="lamp-swatch tail-swatch"></span><span>Хвост</span></div>
-        <div class="train-counter"><span id="active-trains">0</span> поездов на карте</div>
+        <div class="train-counter" role="status"><span id="active-trains" hidden>—</span> <span id="train-counter-label">Загрузка расписания…</span></div>
         <aside class="map-inspector inset-surface" aria-label="Карточка на карте" hidden>
           <button type="button" class="inspector-close instrument-button" aria-label="Закрыть карточку станции">×</button>
           <div class="inspector-content"></div>
@@ -85,6 +85,8 @@ let model = { trips: [], unplaced: [] };
 let selectedStation = stationsConfig.stations.find((station) => station.id === 'dmitrovskaya');
 let selectedTrain = null;
 let localError = null;
+let hasTimetable = false;
+const trainCounter = document.querySelector('#active-trains');
 
 function showTrain(trip) {
   selectedTrain = { tripId: trip.id };
@@ -319,6 +321,7 @@ function updateFullscreen() {
   fullscreenButton.setAttribute('aria-pressed', String(expanded));
   fullscreenButton.setAttribute('aria-label', expanded ? 'Вернуть карту в панель' : 'Развернуть карту на всё окно браузера');
   fullscreenButton.title = expanded ? 'Вернуть карту в панель (Esc)' : 'На всё окно браузера';
+  fullscreenButton.querySelector('.fullscreen-label').textContent = expanded ? 'Свернуть карту' : 'На весь экран';
 }
 function toggleFullscreen() {
   mapFrame.classList.toggle('is-expanded');
@@ -337,6 +340,7 @@ const stopPolling = startSnapshotPolling({
   intervalMs: appConfig.client.snapshotPollIntervalMs,
   onSnapshot(next) {
     localError = null;
+    hasTimetable = next.observations.length > 0 || Object.values(next.stations).some((station) => station.lastSuccessfulAt);
     if (next.publishedAt !== snapshot.publishedAt) {
       snapshot = next; model = buildTrips(snapshot, stationsConfig);
       renderTrainDetails(); renderUnplaced();
@@ -354,6 +358,13 @@ function renderSourceStatus() {
   const cycleBudgetMs = (appConfig.collector.cyclePauseSeconds
     + stationsConfig.pollStationApiIds.length * (appConfig.collector.requestTimeoutSeconds + appConfig.collector.minRequestIntervalMs / 1000) + 60) * 1000;
   const stale = Date.now() - (parseTime(snapshot.publishedAt) || 0) > cycleBudgetMs;
+  trainCounter.hidden = !hasTimetable;
+  const counterLabel = !hasTimetable
+    ? (localError ? 'Нет данных расписания' : 'Ожидание расписания…')
+    : localError ? 'поездов · нет связи с расписанием'
+    : stale ? 'поездов · расписание устарело' : 'поездов на карте';
+  const label = document.querySelector('#train-counter-label');
+  if (label.textContent !== counterLabel) label.textContent = counterLabel;
   document.querySelector('#source-status').textContent = !successful.length
     ? (localError ? 'Локальное расписание недоступно' : 'Ожидание расписания от сборщика')
     : `${localError || errors.length || stale ? 'Последние данные' : 'Обновлено'} ${formatTime(latest)} · ${successful.length}/${stationsConfig.pollStationApiIds.length} станции`;
@@ -364,7 +375,9 @@ let lastFrame = 0;
 function animate(timestamp) {
   if (timestamp - lastFrame >= 30) {
     // Каждый кадр зависит от абсолютного времени, а не накопленного шага.
-    document.querySelector('#active-trains').textContent = sectionMap.renderTrains(model.trips, Date.now());
+    const count = sectionMap.renderTrains(model.trips, Date.now());
+    const value = hasTimetable ? String(count) : '—';
+    if (trainCounter.textContent !== value) trainCounter.textContent = value;
     lastFrame = timestamp;
   }
   frame = requestAnimationFrame(animate);

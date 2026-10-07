@@ -11,6 +11,19 @@ const T = Date.parse('2026-10-07T09:34:30Z');
 const trip = (anchors, extra = {}) => ({ anchors: anchors.map(([s, time]) => ({ s, time })), direction: 1, terminal: null, ...extra });
 const position = (train, now) => getTrainPosition(train, now, stations, motion, 4000);
 
+test('Рижская: Подольск идёт на юг, Нахабино на север даже при ошибочных флагах источника', async () => {
+  const config = JSON.parse(await readFile(new URL('../config/stations.json', import.meta.url), 'utf8'));
+  for (const [destination, direction] of [['Подольск', 1], ['Нахабино', -1], ['Серпухов', 1], ['Львовская', 1], ['Курский Вокзал', 1]]) {
+    const snapshot = { observations: [{ runId: '7392', trainNo: '7392', stationId: 'rizhskaya', destination,
+      toMoscow: false, travelDirection: -direction, departureTime: new Date(T).toISOString(), lastSeenAt: new Date(T).toISOString() }], stations: {} };
+    const train = buildTrips(snapshot, config).trips[0];
+    assert.equal(train.direction, direction);
+    const before = getTrainPosition(train, T + 16000, config.stations, motion, config.section.geometryLengthMeters);
+    const after = getTrainPosition(train, T + 76000, config.stations, motion, config.section.geometryLengthMeters);
+    assert(direction * (after.centerMeters - before.centerMeters) > 0);
+  }
+});
+
 test('12:34:30 по Москве: стоянка строго ±15 секунд без повторного прибавления задержки', () => {
   const train = trip([[1100, T]]);
   assert.equal(position(train, T - 15000).centerMeters, 1100);

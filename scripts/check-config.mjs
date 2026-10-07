@@ -59,6 +59,8 @@ const fadeCoverage = app.motion.fallbackSpeedKmh / 3.6 * app.motion.edgeFadeSeco
 assert(stations.section.geometryExtensionBeforeMeters > fadeCoverage);
 assert(stations.section.geometryExtensionAfterMeters > fadeCoverage);
 const fullD2 = await readJson('../config/d2-stations.json');
+assert.deepEqual(stations.section.destinationDirections, fullD2.section.destinationDirections);
+assert(Object.values(stations.section.destinationDirections).every((direction) => direction === 1 || direction === -1));
 assert.equal(fullD2.stations.length, 37);
 assert.equal(fullD2.pollStationApiIds.length, 23);
 assert.equal(new Set(fullD2.stations.map((station) => station.id)).size, fullD2.stations.length);

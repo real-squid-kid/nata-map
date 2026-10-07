@@ -39,18 +39,44 @@ function timestampOf(mixed $value): ?int
     return $timestamp === false ? null : $timestamp;
 }
 
-function travelDirection(array $train, array $station): ?int
+function destinationDirection(array $train, array $station, array $stations, array $destinationDirections = []): ?int
 {
+    $name = $train['destination'] ?? null;
+    if (!is_string($name) || !isset($station['alongTrackMeters']) || !$stations) return null;
+    $normalize = static fn(string $value): string => preg_replace('/\s+/u', ' ', trim(str_replace(['ё', 'Ё', '–', '—'], ['е', 'Е', '-', '-'], $value)));
+    $name = $normalize($name);
+    foreach ($destinationDirections as $destination => $direction) {
+        if (in_array($direction, [-1, 1], true) && preg_match('/^' . preg_quote($normalize($destination), '/') . '$/iu', $name)) return $direction;
+    }
+    $distances = array_column($stations, 'alongTrackMeters');
+    foreach ($stations as $terminal) {
+        if (!isset($terminal['alongTrackMeters'])) continue;
+        foreach (array_merge([$terminal['name']], $terminal['aliases'] ?? []) as $alias) {
+            if (!preg_match('/^' . preg_quote($normalize($alias), '/') . '$/iu', $name)) continue;
+            // Конечные D2 задают север/юг даже в наблюдении на самой конечной.
+            if ($terminal['alongTrackMeters'] === min($distances)) return -1;
+            if ($terminal['alongTrackMeters'] === max($distances)) return 1;
+            $delta = $terminal['alongTrackMeters'] - $station['alongTrackMeters'];
+            return abs($delta) > 0.001 ? ($delta > 0 ? 1 : -1) : null;
+        }
+    }
+    return null;
+}
+
+function travelDirection(array $train, array $station, array $stations = [], array $destinationDirections = []): ?int
+{
+    $destination = destinationDirection($train, $station, $stations, $destinationDirections);
+    if ($destination !== null) return $destination;
     if (in_array($train['travelDirection'] ?? null, [-1, 1], true)) return $train['travelDirection'];
     if (!is_bool($train['toMoscow'] ?? null)) return null;
     $step = array_key_exists('apiToMoscowDirectionStep', $station) ? $station['apiToMoscowDirectionStep'] : 1;
     return in_array($step, [-1, 1], true) ? ($train['toMoscow'] ? $step : -$step) : null;
 }
 
-function mergeObservations(array $history, array $trains, array $station, string $seenAt, int $windowSeconds): array
+function mergeObservations(array $history, array $trains, array $station, string $seenAt, int $windowSeconds, array $stations = [], array $destinationDirections = []): array
 {
     foreach ($trains as $train) {
-        $train['travelDirection'] = travelDirection($train, $station);
+        $train['travelDirection'] = travelDirection($train, $station, $stations, $destinationDirections);
         $train['alongTrackMeters'] = $station['alongTrackMeters'] ?? null;
         $departure = timestampOf($train['departureTime']);
         $runId = null;
@@ -84,8 +110,22 @@ function mergeObservations(array $history, array $trains, array $station, string
         $previous = $history[$id] ?? null;
         $history[$id] = array_merge($train, [
             'id' => $id, 'runId' => $runId, 'stationId' => $station['id'],
-            'firstSeenAt' => $previous['firstSeenAt'] ?? $seenAt, 'lastSeenAt' => $seenAt,
+            'firstSeenAt' => $previous['firstSeenAt'] ?? $train['firstSeenAt'] ?? $seenAt, 'lastSeenAt' => $seenAt,
         ]);
+    }
+    return $history;
+}
+
+function rebuildObservationHistory(array $observations, array $stations, int $windowSeconds, array $destinationDirections = []): array
+{
+    $stationMap = array_column($stations, null, 'id');
+    // Повторяем объединение от старых снимков к новым; последнее уточнение сохраняется.
+    usort($observations, static fn($a, $b) => (timestampOf($a['lastSeenAt']) ?? 0) <=> (timestampOf($b['lastSeenAt']) ?? 0));
+    $history = [];
+    foreach ($observations as $observation) {
+        $station = $stationMap[$observation['stationId']] ?? null;
+        if ($station === null) continue;
+        $history = mergeObservations($history, [$observation], $station, $observation['lastSeenAt'], $windowSeconds, $stations, $destinationDirections);
     }
     return $history;
 }

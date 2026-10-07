@@ -16,13 +16,11 @@ if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
 ftruncate($lock, 0); fwrite($lock, (string) getmypid()); fflush($lock);
 $statePath = $directory . '/state.json';
 $state = readJsonFile($statePath, ['schemaVersion' => 1, 'stations' => [], 'observations' => [], 'collector' => []]);
-$history = [];
-$stationMap = array_column($config['stations'], null, 'id');
-foreach ($state['observations'] as $observation) {
-    if (!isset($stationMap[$observation['stationId']])) continue;
-    $observation['travelDirection'] = travelDirection($observation, $stationMap[$observation['stationId']]);
-    $history[$observation['id']] = $observation;
-}
+$destinationDirections = $config['section']['destinationDirections'] ?? [];
+$migrateDirections = ($state['directionNormalizationVersion'] ?? 1) < 3;
+$history = $migrateDirections
+    ? rebuildObservationHistory($state['observations'], $config['stations'], $options['tripMatchWindowSeconds'], $destinationDirections)
+    : array_column($state['observations'], null, 'id');
 $once = in_array('--once', $argv, true);
 
 function publishState(string $path, array &$state, array $history): void
@@ -30,6 +28,12 @@ function publishState(string $path, array &$state, array $history): void
     $state['publishedAt'] = isoNow();
     $state['observations'] = array_values($history);
     writeJsonAtomic($path, $state);
+}
+
+if ($migrateDirections) {
+    $state['directionNormalizationVersion'] = 3;
+    publishState($statePath, $state, $history);
+    writeJsonAtomic($directory . '/observations.json', ['schemaVersion' => 1, 'observations' => array_values($history)]);
 }
 
 // Сохраняем межзапросный интервал и паузу цикла даже при быстром перезапуске процесса.
@@ -58,7 +62,7 @@ while (true) {
         try {
             $result = fetchStation($apiId, $options);
             $snapshot = array_merge($snapshot, $result, ['lastSuccessfulAt' => isoNow(), 'error' => null]);
-            $history = mergeObservations($history, $result['trains'], $station, $seenAt, $options['tripMatchWindowSeconds']);
+            $history = mergeObservations($history, $result['trains'], $station, $seenAt, $options['tripMatchWindowSeconds'], $config['stations'], $destinationDirections);
             echo $seenAt . ' ' . $station['name'] . ': ' . count($result['trains']) . ' поездов' . ($result['needReload'] ? ' (needReload)' : '') . "\n";
         } catch (Throwable $error) {
             $snapshot['error'] = $error->getMessage();

@@ -117,7 +117,8 @@ body {
   z-index: 800;
 }
 .zoom-button { width: 38px; height: 38px; font-size: 25px; line-height: 1; }
-.fullscreen-button { width: 38px; height: 38px; font-size: 23px; }
+.fullscreen-button { width: max-content; height: 38px; padding: 0 10px; display: flex; align-items: center; gap: 7px; font-size: 23px; }
+.fullscreen-label { font-size: 11px; font-weight: 600; }
 .map-frame:fullscreen { width: 100%; height: 100%; border: none; border-radius: 0; }
 .map-frame.is-expanded { position: fixed; inset: 0; z-index: 2000; width: 100%; height: 100dvh; border: none; border-radius: 0; }
 .stations-section > summary { cursor: pointer; }
@@ -269,6 +270,13 @@ body {
 .train-renderer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
 .train-capsule, .train-wagons { pointer-events: none; }
 .train-outline { filter: drop-shadow(0 1px 2px #18263185); }
+.train-direction-arrow { filter: drop-shadow(0 1px 1px #18263185); }
+.leaflet-pane > svg.train-renderer .train-proximity-warning { pointer-events: all; cursor: help; }
+.train-proximity-warning circle { fill: #ffe6a5; stroke: #795622; stroke-width: 1.5; filter: drop-shadow(0 1px 2px #172b3c70); }
+.train-proximity-warning text { fill: #523813; font-size: 14px; font-weight: 700; pointer-events: none; }
+.train-proximity-warning:focus-visible { outline: none; }
+.train-proximity-warning:focus-visible circle { stroke: #fff; stroke-width: 3; }
+.train-proximity-tooltip { width: 240px; max-width: calc(100vw - 32px); white-space: normal; }
 .train-wagon { filter: drop-shadow(0 1px 1px #172b3c90); }
 .train-wagon-head { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 1px 1px #172b3c90); }
 .train-wagon-tail { filter: drop-shadow(0 0 2px #fa343e90) drop-shadow(0 1px 1px #172b3c90); }
@@ -346,6 +354,7 @@ body {
 [data-theme="night"] .leaflet-control-attribution a { color: #c0d6df; }
 [data-theme="night"] .train-capsule { filter: drop-shadow(0 0 3px #fff0d5) drop-shadow(0 0 7px #ffdfa280); }
 [data-theme="night"] .train-body { stroke: #fff0d5; }
+[data-theme="night"] .train-direction-arrow { fill: #fff0d5; }
 [data-theme="night"] .train-outline { stroke: #e4d5b4; stroke-width: 10; filter: none; }
 [data-theme="night"] .train-capsule .train-head,
 [data-theme="night"] .train-capsule .train-tail { fill: #fff0d5; filter: none; }

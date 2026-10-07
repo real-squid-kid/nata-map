@@ -41,10 +41,26 @@ export function getTrainLayout({ track, project, centerMeters, direction, trainL
   }
   const headS = centerMeters + direction * half;
   const tailS = centerMeters - direction * half;
+  const mode = zoom >= (night ? options.nightSpriteMinZoom : options.spriteMinZoom) ? 'wagons' : 'capsule';
+  const head = headS >= 0 && headS <= track.length ? at(headS) : null;
+  let arrow = null;
+  if (mode === 'capsule' && head) {
+    const before = at(headS - direction * 10);
+    const after = at(headS + direction * 10);
+    const dx = after.x - before.x;
+    const dy = after.y - before.y;
+    const distance = Math.hypot(dx, dy);
+    // Экранный зазор сохраняет читаемость стрелки при любом масштабе.
+    if (distance > 0.01) arrow = {
+      x: head.x + dx / distance * 13,
+      y: head.y + dy / distance * 13,
+      angle: Math.atan2(dy, dx) * 180 / Math.PI,
+    };
+  }
   return {
-    mode: zoom >= (night ? options.nightSpriteMinZoom : options.spriteMinZoom) ? 'wagons' : 'capsule',
+    mode, arrow,
     points, wagons, center: at(centerMeters),
-    head: headS >= 0 && headS <= track.length ? at(headS) : null,
+    head,
     tail: tailS >= 0 && tailS <= track.length ? at(tailS) : null,
   };
 }

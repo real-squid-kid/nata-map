@@ -41,6 +41,19 @@ test('вагоны имеют зазоры, крайние точки сохра
   }
 });
 
+test('стрелка капсулы идёт перед головой в обоих направлениях и убирается с вагонами или вне покрытия', () => {
+  for (const direction of [1, -1]) {
+    const result = layout({ zoom: 13, direction });
+    assert.equal((result.arrow.x - result.head.x) * direction, 13);
+    assert.equal(result.arrow.y, result.head.y);
+    assert.equal(Math.abs(result.arrow.angle), direction === 1 ? 0 : 180);
+  }
+  assert.equal(layout({ zoom: 14 }).arrow, null);
+  assert(layout({ zoom: 14, night: true }).arrow);
+  assert.equal(layout({ zoom: 15, night: true }).arrow, null);
+  assert.equal(layout({ zoom: 13, centerMeters: 950 }).arrow, null);
+});
+
 test('на границе покрытия невидимые вагоны и огни убираются, видимые обрезаются', () => {
   const result = layout({ centerMeters: -20 });
   assert.deepEqual(result.wagons.map((wagon) => wagon.index), [0, 1, 2]);

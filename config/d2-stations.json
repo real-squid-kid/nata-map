@@ -8,7 +8,8 @@
     "diameter": 2,
     "startStationId": "nakhabino",
     "endStationId": "podolsk",
-    "directionPivotStationId": "kurskaya"
+    "directionPivotStationId": "kurskaya",
+    "destinationDirections": { "Серпухов": 1, "Львовская": 1 }
   },
   "pollStationApiIds": [
     4139,
@@ -271,7 +272,7 @@
       },
       "order": 17,
       "directionZone": "pivot",
-      "aliases": []
+      "aliases": ["Курский вокзал"]
     },
     {
       "id": "moskva-tovarnaya",

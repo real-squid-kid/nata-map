@@ -38,6 +38,38 @@ $delayed = array_merge($record, ['scheduleTime' => $record['departureTime']]);
 $same = mergeObservations([], [$delayed], $north, isoNow(), 10800);
 $same = mergeObservations($same, [array_merge($delayed, ['departureTime' => '2026-10-08T01:00:30+03:00'])], $north, isoNow(), 10800);
 check(count($same) === 1, 'Уточнение задержки сохраняет идентичность по плановому времени');
+$d2 = readJsonFile(dirname(__DIR__) . '/config/stations.json');
+$d2Stations = array_column($d2['stations'], null, 'id');
+$destinationDirections = $d2['section']['destinationDirections'];
+foreach (['Серпухов', 'Львовская', ' серпухов '] as $destination) {
+    foreach ([true, false] as $toMoscow) {
+        check(travelDirection(['destination' => $destination, 'toMoscow' => $toMoscow, 'travelDirection' => -1], $d2Stations['rizhskaya'], $d2['stations'], $destinationDirections) === 1,
+            'Внешние южные конечные имеют приоритет над флагами источника');
+    }
+}
+check(travelDirection(['destination' => 'Курский Вокзал', 'toMoscow' => false], $d2Stations['rizhskaya'], $d2['stations']) === 1, 'Алиас Курской задаёт юг от Рижской');
+check(travelDirection(['destination' => 'Курский Вокзал', 'toMoscow' => false], $d2Stations['pererva'], $d2['stations']) === -1, 'Курская с южной стороны находится на севере');
+foreach (['Подольск' => 1, 'Нахабино' => -1] as $destination => $expected) {
+    foreach ([true, false] as $toMoscow) {
+        foreach (['rizhskaya', 'dmitrovskaya', 'pererva', 'podolsk', 'nakhabino'] as $stationId) {
+            check(travelDirection(['destination' => $destination, 'toMoscow' => $toMoscow, 'travelDirection' => -$expected], $d2Stations[$stationId], $d2['stations']) === $expected,
+                'Конечная D2 определяет север/юг независимо от ошибочного флага и сохранённого направления');
+        }
+    }
+}
+$southbound = array_merge($record, ['trainNo' => '7392', 'destination' => 'Подольск', 'travelDirection' => 1]);
+$wrongHistory = mergeObservations([], [$southbound], $d2Stations['dmitrovskaya'], '2026-10-07T23:58:00+03:00', 10800);
+$wrongHistory = mergeObservations($wrongHistory, [array_merge($southbound, ['toMoscow' => false, 'travelDirection' => -1, 'departureTime' => '2026-10-08T00:06:30+03:00'])], $d2Stations['rizhskaya'], '2026-10-08T00:00:00+03:00', 10800);
+check(count(array_unique(array_column($wrongHistory, 'runId'))) === 2, 'Воспроизведён дубль №7392 из ошибочного направления Рижской');
+$repaired = rebuildObservationHistory(array_values($wrongHistory), $d2['stations'], 10800);
+check(count($repaired) === 2 && count(array_unique(array_column($repaired, 'runId'))) === 1, 'Миграция объединяет оба якоря №7392 в один рейс');
+check(array_unique(array_column($repaired, 'travelDirection')) === [1], '№7392 следует на юг');
+check(array_column(array_values($repaired), 'departureTime') === array_column(array_values($wrongHistory), 'departureTime'), 'Миграция не сдвигает времена движения');
+check(array_column(array_values($repaired), 'toMoscow') === [true, false], 'Исходные флаги сохраняются');
+check(rebuildObservationHistory(array_values($repaired), $d2['stations'], 10800) === $repaired, 'Повторная миграция не меняет историю');
+$serpukhovHistory = array_map(static fn($o) => array_merge($o, ['destination' => 'Серпухов']), $wrongHistory);
+$serpukhovRepaired = rebuildObservationHistory(array_values($serpukhovHistory), $d2['stations'], 10800, $destinationDirections);
+check(count(array_unique(array_column($serpukhovRepaired, 'runId'))) === 1 && array_unique(array_column($serpukhovRepaired, 'travelDirection')) === [1], 'Миграция объединяет ошибочный дубль поезда в Серпухов');
 $normalized = normalizeStation(['stationId' => 4127, 'trains' => [[
     'trainNo' => null, 'toMoscow' => true, 'departureTime' => 'bad', 'equipment' => 'private',
     'i18n' => ['ru' => ['destination' => '<b>Текст</b>', 'trainClass' => ['name' => 'Новый тип'], 'stops' => 'Исходный текст']],

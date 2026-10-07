@@ -8,6 +8,7 @@
     "startStationId": "nakhabino",
     "endStationId": "podolsk",
     "directionPivotStationId": "kurskaya",
+    "destinationDirections": { "Серпухов": 1, "Львовская": 1 },
     "id": "d2-nakhabino-podolsk",
     "geometryFile": "railway.geojson",
     "geometryStatus": "connected-and-station-alignment-checked",
@@ -398,7 +399,7 @@
       },
       "order": 17,
       "directionZone": "pivot",
-      "aliases": [],
+      "aliases": ["Курский вокзал"],
       "apiToMoscowDirectionStep": null,
       "alongTrackMeters": 38574.637,
       "trackLocation": {

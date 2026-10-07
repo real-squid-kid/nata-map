@@ -33,6 +33,41 @@ const fixture = () => {
     }])) };
 };
 
+test('Рижская: Подольск и Серпухов движутся со стрелкой на юг при toMoscow=false', async ({ page }) => {
+  await page.clock.install({ time: instant });
+  await page.clock.setFixedTime(instant);
+  const snapshot = fixture();
+  snapshot.observations = [
+    { ...snapshot.observations[0], runId: 'podolsk-7392', trainNo: '7392', stationId: 'rizhskaya', toMoscow: false, travelDirection: -1, destination: 'Подольск' },
+    { ...snapshot.observations[1], runId: 'nakhabino-7288', trainNo: '7288', stationId: 'rizhskaya', toMoscow: false, travelDirection: 1, destination: 'Нахабино' },
+    { ...snapshot.observations[0], runId: 'serpukhov', trainNo: '6100', stationId: 'rizhskaya', toMoscow: false, travelDirection: -1, destination: 'Серпухов' },
+  ];
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await stubTiles(page);
+  await page.goto('/');
+  await page.locator('.station-button[data-station-id="rizhskaya"]').click();
+  await page.locator('.map-diagnostics').evaluate((element) => { element.open = true; });
+  for (const zoom of [14, 13]) {
+    await page.locator('#zoom-out').click();
+    await expect(page.locator('#zoom-value')).toHaveText(`${zoom}`);
+  }
+  const south = page.locator('.train-visual[data-train-id="podolsk-7392"]');
+  const north = page.locator('.train-visual[data-train-id="nakhabino-7288"]');
+  const serpukhov = page.locator('.train-visual[data-train-id="serpukhov"]');
+  await expect(south).toHaveAttribute('data-direction', '1');
+  await expect(north).toHaveAttribute('data-direction', '-1');
+  await expect(serpukhov).toHaveAttribute('data-direction', '1');
+  for (const [train, direction] of [[south, 1], [north, -1], [serpukhov, 1]]) {
+    const points = await train.evaluate((node) => ({ headY: Number(node.querySelector('.train-head').getAttribute('cy')),
+      tailY: Number(node.querySelector('.train-tail').getAttribute('cy')), arrowY: node.querySelector('.train-direction-arrow').transform.baseVal.consolidate().matrix.f }));
+    expect(direction * (points.headY - points.tailY)).toBeGreaterThan(0);
+    expect(direction * (points.arrowY - points.headY)).toBeGreaterThan(0);
+  }
+  const headY = Number(await south.locator('.train-head').getAttribute('cy'));
+  await page.clock.setFixedTime(new Date(instant.getTime() + 60000));
+  await expect.poll(async () => Number(await south.locator('.train-head').getAttribute('cy'))).toBeGreaterThan(headY);
+});
+
 test('спрайты, встречные пути, переключение масштаба и три ближайших отправления', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -53,6 +88,7 @@ test('спрайты, встречные пути, переключение ма
     await expect(page.locator('#zoom-value')).toHaveText(`${zoom - 1}`);
   }
   await expect(page.locator('.train-visual[data-render-mode="capsule"]')).toHaveCount(2);
+  await expect(page.locator('.train-direction-arrow:visible')).toHaveCount(2);
   await expect(page.locator('.train-outline').first()).toHaveCSS('stroke-width', '12px');
   await expect(page.locator('.train-outline').first()).not.toHaveCSS('filter', 'none');
   await mkdir('var/qa', { recursive: true });
@@ -60,6 +96,7 @@ test('спрайты, встречные пути, переключение ма
   await page.locator('#zoom-in').click();
   await expect(page.locator('#zoom-value')).toHaveText('14');
   await expect(page.locator('.train-visual[data-render-mode="wagons"]')).toHaveCount(2);
+  await expect(page.locator('.train-direction-arrow:visible')).toHaveCount(0);
   for (const train of await page.locator('.train-visual').all()) {
     await expect(train.locator('.train-wagon:visible')).toHaveCount(6);
     expect(await train.locator('.train-wagon').evaluateAll((wagons) => wagons.map((wagon) => wagon.dataset.wagonRole)))
@@ -101,7 +138,7 @@ test('спрайты, встречные пути, переключение ма
   expect(mockedTiles()).toBeGreaterThan(0);
 });
 
-test('живой снимок и настоящая подложка', async ({ page, request }) => {
+test('живой снимок и настоящая подложка', { tag: '@live' }, async ({ page, request }) => {
   const response = await request.get('/api/state');
   expect(response.ok()).toBeTruthy();
   const snapshot = await response.json();
@@ -247,6 +284,8 @@ test('локальный кэш переживает zoom и перезагру�
   await expect(page.locator('.leaflet-dimming-pane')).toHaveCSS('background-color', 'rgba(18, 23, 20, 0.68)');
   await expect(page.locator('.train-visual[data-render-mode="capsule"]')).toHaveCount(2);
   await expect(page.locator('.train-body').first()).toHaveCSS('stroke', 'rgb(255, 240, 213)');
+  await expect(page.locator('.train-direction-arrow:visible')).toHaveCount(2);
+  await expect(page.locator('.train-direction-arrow').first()).toHaveCSS('fill', 'rgb(255, 240, 213)');
   await page.screenshot({ path: 'var/qa/night-z14.png' });
   await page.locator('#zoom-in').click();
   await expect(page.locator('#zoom-value')).toHaveText('15');
@@ -323,6 +362,63 @@ test('автоматическая ночь по Москве, ручной вы
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
 });
 
+test('нет локального API: отсутствие данных не выглядит как ноль поездов; восстановление и последующий сбой', async ({ page }) => {
+  await page.clock.install({ time: instant });
+  await page.clock.setFixedTime(instant);
+  let available = false;
+  let empty = false;
+  let attempts = 0;
+  await page.route('**/api/state', (route) => {
+    attempts++;
+    const state = fixture();
+    if (empty) { state.publishedAt = iso(1); state.observations = []; }
+    return available ? route.fulfill({ json: state }) : route.fulfill({ status: 502, body: 'Bad Gateway' });
+  });
+  await stubTiles(page);
+  await page.goto('/');
+  await expect(page.locator('#train-counter-label')).toHaveText('Нет данных расписания');
+  await expect(page.locator('#active-trains')).toBeHidden();
+  await expect(page.locator('#source-status')).toHaveText('Локальное расписание недоступно');
+  available = true;
+  await expect(page.locator('#active-trains')).toHaveText('2', { timeout: 10000 });
+  await expect(page.locator('#active-trains')).toBeVisible();
+  await expect(page.locator('.train-visual')).toHaveCount(2);
+  available = false;
+  await expect(page.locator('#train-counter-label')).toHaveText('поездов · нет связи с расписанием', { timeout: 10000 });
+  await expect(page.locator('.train-visual')).toHaveCount(2);
+  available = true; empty = true;
+  await expect(page.locator('#active-trains')).toHaveText('0', { timeout: 10000 });
+  await expect(page.locator('#active-trains')).toBeVisible();
+  await expect(page.locator('#train-counter-label')).toHaveText('поездов на карте');
+  expect(attempts).toBeGreaterThanOrEqual(4);
+});
+
+test('локальный живой API передаёт рассчитанные поезда в SVG без загрузки платных тайлов', { tag: '@live' }, async ({ page, request }) => {
+  const response = await request.get('/api/state');
+  expect(response.ok()).toBe(true);
+  const snapshot = await response.json();
+  expect(Date.now() - Date.parse(snapshot.publishedAt)).toBeLessThan(10 * 60 * 1000);
+  const { buildTrips } = await import('../../src/trips.js');
+  const { getTrainPosition } = await import('../../src/motion.js');
+  const config = JSON.parse(await readFile(new URL('../../config/stations.json', import.meta.url), 'utf8'));
+  const app = JSON.parse(await readFile(new URL('../../config/app.json', import.meta.url), 'utf8'));
+  const now = Date.now();
+  const expected = buildTrips(snapshot, config).trips.filter((trip) => getTrainPosition(trip, now, config.stations, app.motion, config.section.geometryLengthMeters).visible).length;
+  await page.clock.install({ time: new Date(now) });
+  await page.clock.setFixedTime(new Date(now));
+  // Снимок получен от работающего API, время фиксировано для точного сравнения счётчика и SVG.
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await stubTiles(page);
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('#active-trains')).toHaveText(String(expected));
+  await expect(page.locator('#active-trains')).toBeVisible();
+  await expect(page.locator('.train-visual')).toHaveCount(expected);
+  expect(errors).toEqual([]);
+  console.log(JSON.stringify({ publishedAt: snapshot.publishedAt, expectedActiveTrains: expected, renderedTrains: await page.locator('.train-visual').count() }));
+});
+
 test('список без скачков hover, мягкий край тайлов и карточки поверх развёрнутой карты', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -349,6 +445,10 @@ test('список без скачков hover, мягкий край тайло
   await page.locator('.station-button[data-station-id="grazhdanskaya"]').click();
   await page.locator('#fullscreen').click();
   await expect(page.locator('.map-inspector')).toBeHidden();
+  await expect(page.locator('#fullscreen')).toContainText('Свернуть карту');
+  await expect(page.locator('#fullscreen')).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await page.locator('#map').boundingBox()).height).toBe(600);
+  await expect.poll(async () => (await page.locator('#map').boundingBox()).width).toBe(1024);
   const marker = page.locator('.station-marker[data-station-id="grazhdanskaya"]');
   await marker.focus(); await page.keyboard.press('Space');
   await expect(page.locator('.map-inspector #station-details h2')).toHaveText('Гражданская');
@@ -363,6 +463,7 @@ test('список без скачков hover, мягкий край тайло
   await page.locator('.train-visual').first().focus(); await page.keyboard.press('Enter');
   await page.keyboard.press('Escape');
   await expect(page.locator('.sidebar #train-details')).toBeVisible();
+  await expect(page.locator('#fullscreen')).toContainText('На весь экран');
   await expect(page.locator('#fullscreen')).toBeFocused();
   await page.locator('#theme-toggle').click();
   await page.screenshot({ path: 'var/qa/frontend-night.png' });
@@ -373,5 +474,52 @@ test('список без скачков hover, мягкий край тайло
   await page.keyboard.press('Escape');
   await page.screenshot({ path: 'var/qa/frontend-mobile.png' });
   expect(requests()).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('близкие попутные поезда: постоянные знаки, пояснение и снятие после расхождения', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.clock.install({ time: instant });
+  await page.clock.setFixedTime(instant);
+  let snapshot = fixture();
+  snapshot.observations.push({ ...snapshot.observations[0], runId: 'close-follower', trainNo: '6410', departureTime: iso(30) });
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await stubTiles(page);
+  await page.goto('/');
+  await page.locator('.station-button[data-station-id="grazhdanskaya"]').click();
+  const warnings = page.locator('.train-proximity-warning:visible');
+  await expect(warnings).toHaveCount(2);
+  await expect(page.locator('.train-proximity-warning[data-train-id="meeting-1"]')).toBeHidden();
+  const message = 'Поезда подозрительно близко. Возможно, они идут по разным путям.';
+  await warnings.first().hover();
+  await expect(page.locator('.train-proximity-tooltip')).toHaveText(message);
+  await warnings.first().click();
+  await expect(page.locator('#train-details')).toBeHidden();
+  await page.mouse.move(0, 0);
+  await warnings.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.train-proximity-tooltip')).toHaveText(message);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.train-proximity-tooltip')).toHaveCount(0);
+  await page.locator('.map-diagnostics').evaluate((element) => { element.open = true; });
+  for (const zoom of [14, 13]) {
+    await page.locator('#zoom-out').click();
+    await expect(page.locator('#zoom-value')).toHaveText(`${zoom}`);
+  }
+  await expect(page.locator('.train-visual[data-render-mode="capsule"]')).toHaveCount(3);
+  await expect(warnings).toHaveCount(2);
+  await page.locator('#theme-toggle').click();
+  await expect(warnings).toHaveCount(2);
+  await page.locator('#fullscreen').click();
+  await expect(warnings).toHaveCount(2);
+  await warnings.first().focus();
+  await page.keyboard.press('Enter');
+  await page.screenshot({ path: 'var/qa/proximity-night-expanded.png' });
+  snapshot = { ...snapshot, publishedAt: iso(1), observations: snapshot.observations.map((record) => record.runId === 'close-follower' ? { ...record, departureTime: iso(300) } : record) };
+  await expect(warnings).toHaveCount(0, { timeout: 10000 });
+  await expect(page.locator('.train-proximity-tooltip')).toHaveCount(0);
+  await page.locator('#fullscreen').click();
+  await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
   expect(errors).toEqual([]);
 });
