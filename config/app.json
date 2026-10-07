@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "timezone": "Europe/Moscow",
+  "map": {
+    "tileProvider": "thunderforest",
+    "tileStyle": "transport",
+    "corridorBufferMeters": 500
+  },
+  "motion": {
+    "anchorField": "departureTime",
+    "trainLengthMeters": 160,
+    "dwellSeconds": 30,
+    "terminalDwellSeconds": 120,
+    "fallbackSpeedKmh": 60
+  },
+  "collector": {
+    "baseUrl": "https://mcd.nata-info.ru",
+    "build": 84,
+    "minRequestIntervalMs": 1000,
+    "cyclePauseSeconds": 120
+  },
+  "client": { "snapshotPollIntervalMs": 5000 }
+}

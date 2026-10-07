@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-10-07",
+  "source": "user-provided station coordinates, API IDs and direction mapping",
+  "timezone": "Europe/Moscow",
+  "section": {
+    "id": "d2-streshnevo-maryina-roshcha",
+    "diameter": 2,
+    "startStationId": "streshnevo",
+    "endStationId": "maryina-roshcha",
+    "geometryFile": "railway.geojson",
+    "geometryStatus": "topology-and-station-alignment-checked",
+    "distanceUnit": "meters",
+    "toMoscowDirectionStep": 1,
+    "fromMoscowDirectionStep": -1,
+    "apiDirectionForToMoscow": 2,
+    "apiDirectionForFromMoscow": 1,
+    "geometryLengthMeters": 9459.515,
+    "stationSpanMeters": 8959.492,
+    "geometryExtensionBeforeMeters": 249.966,
+    "geometryExtensionAfterMeters": 250.057,
+    "geometryRole": "representative-path-for-both-directions"
+  },
+  "pollStationApiIds": [
+    4127,
+    4128,
+    4129
+  ],
+  "stations": [
+    {
+      "id": "streshnevo",
+      "name": "Стрешнево",
+      "order": 0,
+      "apiStationId": null,
+      "pollEnabled": false,
+      "location": {
+        "latitude": 55.815231,
+        "longitude": 37.489952
+      },
+      "alongTrackMeters": 249.966,
+      "trackLocation": {
+        "latitude": 55.815216675,
+        "longitude": 37.489950628
+      },
+      "trackOffsetMeters": 1.595
+    },
+    {
+      "id": "krasny-baltiets",
+      "name": "Красный Балтиец",
+      "order": 1,
+      "apiStationId": 4129,
+      "pollEnabled": true,
+      "location": {
+        "latitude": 55.815521,
+        "longitude": 37.526588
+      },
+      "alongTrackMeters": 2543.399,
+      "trackLocation": {
+        "latitude": 55.8155090154,
+        "longitude": 37.5265896405
+      },
+      "trackOffsetMeters": 1.337
+    },
+    {
+      "id": "grazhdanskaya",
+      "name": "Гражданская",
+      "order": 2,
+      "apiStationId": 4128,
+      "pollEnabled": true,
+      "location": {
+        "latitude": 55.805497,
+        "longitude": 37.553248
+      },
+      "alongTrackMeters": 4632.473,
+      "trackLocation": {
+        "latitude": 55.8055209298,
+        "longitude": 37.5532681213
+      },
+      "trackOffsetMeters": 2.943
+    },
+    {
+      "id": "dmitrovskaya",
+      "name": "Дмитровская",
+      "order": 3,
+      "apiStationId": 4127,
+      "pollEnabled": true,
+      "location": {
+        "latitude": 55.807967,
+        "longitude": 37.578445
+      },
+      "alongTrackMeters": 6265.16,
+      "trackLocation": {
+        "latitude": 55.8079486918,
+        "longitude": 37.5784548196
+      },
+      "trackOffsetMeters": 2.126
+    },
+    {
+      "id": "maryina-roshcha",
+      "name": "Марьина Роща",
+      "order": 4,
+      "apiStationId": null,
+      "pollEnabled": false,
+      "location": {
+        "latitude": 55.801089,
+        "longitude": 37.619896
+      },
+      "alongTrackMeters": 9209.458,
+      "trackLocation": {
+        "latitude": 55.8010332734,
+        "longitude": 37.6199034693
+      },
+      "trackOffsetMeters": 6.214
+    }
+  ]
+}
