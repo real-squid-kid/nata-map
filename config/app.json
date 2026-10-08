@@ -36,7 +36,7 @@
   },
   "collector": {
     "baseUrl": "https://mcd.nata-info.ru",
-    "build": 84,
+    "build": 1791447913,
     "minRequestIntervalMs": 1000,
     "cyclePauseSeconds": 300,
     "requestTimeoutSeconds": 20,

@@ -393,6 +393,66 @@ test('нет локального API: отсутствие данных не в
   expect(attempts).toBeGreaterThanOrEqual(4);
 });
 
+test('несовпадение версии API: немодальное предупреждение, движение и восстановление снимка', async ({ page }) => {
+  const errors = [];
+  const dialogs = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('dialog', async (dialog) => { dialogs.push(dialog.message()); await dialog.dismiss(); });
+  await page.clock.install({ time: instant });
+  await page.clock.setFixedTime(instant);
+  let snapshot = fixture();
+  // Несовпадение относится к другой станции: предупреждение должно быть общим.
+  snapshot.stations.anikeevka.needReload = true;
+  snapshot.stations.grazhdanskaya.needReload = false;
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await stubTiles(page);
+  await page.goto('/');
+  await page.locator('.station-button[data-station-id="grazhdanskaya"]').click();
+  const warning = page.locator('#api-version-warning');
+  const message = 'Версия API сервера Nata Info отличается от ожидаемый. Что-то (или ничего) может быть боркнуто до момента применения фикса.';
+  await expect(warning).toHaveText(message);
+  await expect(warning).toBeVisible();
+  await expect(warning).toHaveAttribute('role', 'status');
+  await expect(warning).toHaveAttribute('aria-live', 'polite');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('#active-trains')).toHaveText('2');
+  for (const group of await page.locator('.departures-group').all()) {
+    await expect(group.locator('.departure-button')).toHaveCount(3);
+  }
+  const train = page.locator('.train-visual[data-train-id="meeting-0"] .train-hit');
+  const previousPosition = await train.getAttribute('d');
+  await page.clock.setFixedTime(new Date(iso(30)));
+  await expect.poll(() => train.getAttribute('d')).not.toBe(previousPosition);
+  await page.locator('#fullscreen').click();
+  await expect(page.locator('.map-frame')).toHaveClass(/is-expanded/);
+  await expect(warning).toBeInViewport();
+  await expect(page.locator('.train-visual')).toHaveCount(2);
+
+  snapshot = { ...snapshot, publishedAt: iso(1), stations: Object.fromEntries(
+    Object.entries(snapshot.stations).map(([id, state]) => [id, { ...state, needReload: false }]),
+  ) };
+  await expect(warning).toBeHidden({ timeout: 10000 });
+  snapshot = { ...snapshot, publishedAt: iso(2), stations: {
+    ...snapshot.stations, anikeevka: { ...snapshot.stations.anikeevka, needReload: true },
+  } };
+  await expect(warning).toBeVisible({ timeout: 10000 });
+  snapshot = { ...snapshot, publishedAt: iso(3), stations: Object.fromEntries(
+    Object.entries(snapshot.stations).map(([id, state]) => {
+      const { needReload, ...current } = state;
+      return [id, current];
+    }),
+  ) };
+  await expect(warning).toBeHidden({ timeout: 10000 });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
+  await expect(page.locator('#active-trains')).toHaveText('2');
+  for (const group of await page.locator('.departures-group').all()) {
+    await expect(group.locator('.departure-button')).toHaveCount(3);
+  }
+  expect(dialogs).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('локальный живой API передаёт рассчитанные поезда в SVG без загрузки платных тайлов', { tag: '@live' }, async ({ page, request }) => {
   const response = await request.get('/api/state');
   expect(response.ok()).toBe(true);

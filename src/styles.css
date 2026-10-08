@@ -100,12 +100,26 @@ body {
 }
 .map-frame {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   border-radius: 12px;
   border: 1px solid #adafa5;
   overflow: hidden;
   box-shadow: inset 0 2px 5px #313b3230, 0 1px 0 #fff;
+}
+.map-viewport { position: relative; flex: 1; min-height: 0; min-width: 0; }
+.api-version-warning {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid #b9a260;
+  background: linear-gradient(#fff5d8, #e9d7aa);
+  color: #5d451e;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: inset 0 1px 0 #fff9, 0 2px 4px #30271b20;
 }
 #map { height: 100%; width: 100%; background: #daddd5; font-family: var(--font-sans); }
 .map-toolbar {
@@ -325,6 +339,7 @@ body {
 [data-theme="night"] .instrument-button:active { background: #25323b; box-shadow: inset 0 2px 4px #0008; }
 [data-theme="night"] .inset-surface { background: #202c34; border-color: #485660; box-shadow: inset 0 2px 5px #0005, 0 1px 0 #ffffff0b; }
 [data-theme="night"] .map-frame { border-color: #53616b; }
+[data-theme="night"] .api-version-warning { color: #f2dba6; background: linear-gradient(#4a4030, #352e25); border-color: #8c754e; box-shadow: inset 0 1px 0 #ffffff15, 0 2px 4px #0005; }
 [data-theme="night"] .station-button { color: #d4dcdf; }
 [data-theme="night"] .station-button:hover { background: transparent; }
 [data-theme="night"] .station-button[aria-pressed="true"] { color: #fff; }

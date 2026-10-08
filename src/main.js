@@ -20,6 +20,8 @@ app.innerHTML = `
     </header>
     <div class="workspace">
       <section class="map-frame" aria-label="Карта участка D2">
+        <p id="api-version-warning" class="api-version-warning" role="status" aria-live="polite" hidden>Версия API сервера Nata Info отличается от ожидаемый. Что-то (или ничего) может быть боркнуто до момента применения фикса.</p>
+        <div class="map-viewport">
         <div id="map" aria-label="Карта: станции и расчётные положения электричек D2"></div>
         <div class="map-toolbar" role="group" aria-label="Масштаб карты">
           <button type="button" class="instrument-button zoom-button" id="zoom-in" aria-label="Приблизить">+</button>
@@ -32,6 +34,7 @@ app.innerHTML = `
           <button type="button" class="inspector-close instrument-button" aria-label="Закрыть карточку станции">×</button>
           <div class="inspector-content"></div>
         </aside>
+        </div>
       </section>
       <aside class="sidebar" aria-label="Станции и сведения">
         <details class="stations-section" id="stations-section" open>
@@ -114,7 +117,6 @@ function renderStationDetails() {
     const status = !state?.lastSuccessfulAt ? (state?.error ? 'Расписание недоступно.' : 'Ожидание первого расписания.')
       : `${state.error ? 'Последние данные' : 'Обновлено'} ${formatTime(state.lastSuccessfulAt)}`;
     nodes.push(element('p', status, 'station-distance'));
-    if (state?.needReload) nodes.push(element('p', 'Источник сообщает об изменении версии.', 'source-note'));
     if (state?.error) nodes.push(element('p', state.lastSuccessfulAt
       ? 'Ошибка обновления; сохранённое расписание продолжает использоваться.' : 'Источник не передал расписание станции.', 'source-note'));
     for (const [direction, label] of [[true, 'В Москву'], [false, 'Из Москвы']]) {
@@ -352,6 +354,7 @@ const stopPolling = startSnapshotPolling({
 });
 
 function renderSourceStatus() {
+  document.querySelector('#api-version-warning').hidden = !Object.values(snapshot.stations).some((station) => station.needReload === true);
   const successful = Object.values(snapshot.stations).filter((station) => station.lastSuccessfulAt);
   const errors = Object.values(snapshot.stations).filter((station) => station.error || station.needReload);
   const latest = successful.map((station) => parseTime(station.lastSuccessfulAt)).sort((a, b) => a - b)[0];
