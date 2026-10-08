@@ -7,11 +7,12 @@
     "node": ">=24.14.0 <25"
   },
   "scripts": {
+    "start": "node scripts/dev.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check-config.mjs",
-    "test": "node --test scripts/corridor.test.mjs scripts/motion.test.mjs scripts/train-layout.test.mjs scripts/train-proximity.test.mjs",
+    "test": "node --test scripts/corridor.test.mjs scripts/motion.test.mjs scripts/train-layout.test.mjs scripts/train-proximity.test.mjs scripts/dev.test.mjs",
     "test:browser": "playwright test",
     "test:server": "php scripts/server.test.php",
     "collect": "php server/collector.php",
