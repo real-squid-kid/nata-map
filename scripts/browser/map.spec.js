@@ -33,6 +33,102 @@ const fixture = () => {
     }])) };
 };
 
+for (const url of ['/?fullScreen=true', '/index.html?fullScreen=true']) {
+  test(`демонстрационный экран ${url}: карта сразу занимает окно, карточки и выход работают`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 1024, height: 600 });
+    await page.clock.install({ time: instant });
+    await page.clock.setFixedTime(instant);
+    await page.route('**/api/state', (route) => route.fulfill({ json: fixture() }));
+    await stubTiles(page);
+    // Проверяем первую вставку интерфейса, до следующих кадров и действий пользователя.
+    await page.addInitScript(() => {
+      window.__firstMapLayout = null;
+      const observer = new MutationObserver((records) => {
+        const appInserted = records.some((record) => record.type === 'childList'
+          && record.target instanceof Element && record.target.id === 'app'
+          && [...record.addedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE));
+        const frame = document.querySelector('#app .map-frame');
+        if (!appInserted || !frame) return;
+        window.__firstMapLayout = {
+          bodyExpanded: document.body.classList.contains('map-expanded'),
+          frameExpanded: frame.classList.contains('is-expanded'),
+          chromeDisplay: [...document.querySelectorAll('.panel-header, .sidebar, .panel-footer')]
+            .map((node) => getComputedStyle(node).display),
+        };
+        observer.disconnect();
+      });
+      observer.observe(document, { childList: true, subtree: true });
+    });
+    await page.goto(url);
+    await expect(page.locator('.map-frame')).toHaveClass(/is-expanded/);
+    expect(await page.evaluate(() => window.__firstMapLayout)).toEqual({
+      bodyExpanded: true, frameExpanded: true, chromeDisplay: ['none', 'none', 'none'],
+    });
+    const fullscreen = page.locator('#fullscreen');
+    await expect(fullscreen).toHaveAttribute('aria-pressed', 'true');
+    await expect(fullscreen).toContainText('Свернуть карту');
+    for (const selector of ['.panel-header', '.sidebar', '.panel-footer']) {
+      await expect(page.locator(selector)).toBeHidden();
+    }
+    await expect.poll(async () => (await page.locator('#map').boundingBox()).width).toBe(1024);
+    await expect.poll(async () => (await page.locator('#map').boundingBox()).height).toBe(600);
+    await expect(page.locator('.station-marker')).toHaveCount(37);
+    await expect(page.locator('.train-visual')).toHaveCount(2);
+    await expect(page.locator('.map-inspector')).toBeHidden();
+
+    const station = page.locator('.station-marker[data-station-id="grazhdanskaya"]');
+    await station.focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('.map-inspector #station-details h2')).toHaveText('Гражданская');
+    for (const group of await page.locator('.map-inspector .departures-group').all()) {
+      await expect(group.locator('.departure-button')).toHaveCount(3);
+    }
+    await page.locator('.inspector-close').click();
+    await page.locator('.train-visual[data-train-id="meeting-0"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.map-inspector #train-details h2')).toHaveText('Поезд № 6400');
+    await expect(page.locator('.map-inspector')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
+    await expect(fullscreen).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.sidebar #train-details')).toBeVisible();
+    for (const selector of ['.panel-header', '.sidebar', '.panel-footer']) {
+      await expect(page.locator(selector)).toBeVisible();
+    }
+    await expect(fullscreen).toBeFocused();
+
+    // Параметр действует при каждом открытии ссылки, а выход доступен обычной кнопкой.
+    await page.reload();
+    await expect(page.locator('.map-frame')).toHaveClass(/is-expanded/);
+    await expect(fullscreen).toHaveAttribute('aria-pressed', 'true');
+    await fullscreen.click();
+    await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
+    await expect(fullscreen).toHaveAttribute('aria-pressed', 'false');
+    await page.goto('/');
+    await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
+    await expect(page.locator('.sidebar')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+test('без fullScreen=true обычная компоновка сохраняется', async ({ page }) => {
+  await page.clock.install({ time: instant });
+  await page.clock.setFixedTime(instant);
+  await page.route('**/api/state', (route) => route.fulfill({ json: fixture() }));
+  await stubTiles(page);
+  for (const url of ['/', '/?fullScreen=false', '/index.html?fullScreen=false']) {
+    await page.goto(url);
+    await expect(page.locator('.map-frame')).not.toHaveClass(/is-expanded/);
+    await expect(page.locator('#fullscreen')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.panel-header')).toBeVisible();
+    await expect(page.locator('.sidebar')).toBeVisible();
+    await expect(page.locator('.panel-footer')).toBeVisible();
+  }
+});
+
 test('Рижская: Подольск и Серпухов движутся со стрелкой на юг при toMoscow=false', async ({ page }) => {
   await page.clock.install({ time: instant });
   await page.clock.setFixedTime(instant);

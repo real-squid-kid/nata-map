@@ -408,6 +408,7 @@ body {
 .schedule-section { margin-top: 14px; }
 .inset-surface { box-shadow: inset 0 2px 6px #323b322b, 0 1px 0 #fff; }
 .map-expanded { overflow: hidden; }
+.map-expanded .panel-header, .map-expanded .sidebar, .map-expanded .panel-footer { display: none; }
 .map-frame.is-expanded { min-height: 0; height: 100dvh; }
 .map-inspector { position: absolute; z-index: 900; top: 64px; right: 16px; width: min(320px, calc(100% - 82px)); max-height: calc(100% - 114px); padding: 16px; overflow-y: auto; overscroll-behavior: contain; box-shadow: inset 0 1px #fff9, 0 8px 24px #0004; }
 .map-inspector .station-details, .map-inspector .train-details { margin: 0; padding: 0; }

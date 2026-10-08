@@ -11,6 +11,9 @@ import { automaticNight, themePeriod } from './theme.js';
 
 const app = document.querySelector('#app');
 const diameterColor = appConfig.map.diameterColors[stationsConfig.section.diameter];
+const startFullscreen = new URLSearchParams(window.location.search).get('fullScreen') === 'true';
+// Устанавливаем режим до создания интерфейса и первого измерения карты.
+document.body.classList.toggle('map-expanded', startFullscreen);
 app.style.setProperty('--diameter-color', diameterColor);
 app.innerHTML = `
   <section class="instrument-panel map-panel">
@@ -19,7 +22,7 @@ app.innerHTML = `
       <div class="header-tools"><time id="moscow-clock"></time><button type="button" class="instrument-button theme-button" id="theme-toggle" aria-pressed="false">Ночной режим</button><button type="button" class="instrument-button overview-button" id="overview">Весь диаметр</button></div>
     </header>
     <div class="workspace">
-      <section class="map-frame" aria-label="Карта участка D2">
+      <section class="map-frame${startFullscreen ? ' is-expanded' : ''}" aria-label="Карта участка D2">
         <p id="api-version-warning" class="api-version-warning" role="status" aria-live="polite" hidden>Версия API сервера Nata Info отличается от ожидаемый. Что-то (или ничего) может быть боркнуто до момента применения фикса.</p>
         <div class="map-viewport">
         <div id="map" aria-label="Карта: станции и расчётные положения электричек D2"></div>
