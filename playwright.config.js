@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './scripts/browser',
+  testMatch: 'no-server.spec.js',
   outputDir: './var/qa/results',
   workers: 1,
   timeout: 30000,

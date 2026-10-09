@@ -342,11 +342,12 @@ document.addEventListener('keydown', exitExpanded);
 updateFullscreen();
 
 const stopPolling = startSnapshotPolling({
-  intervalMs: appConfig.client.snapshotPollIntervalMs,
+  config: stationsConfig,
+  options: appConfig.collector,
   onSnapshot(next) {
     localError = null;
     hasTimetable = next.observations.length > 0 || Object.values(next.stations).some((station) => station.lastSuccessfulAt);
-    if (next.publishedAt !== snapshot.publishedAt) {
+    if (next.collector?.revision !== snapshot.collector?.revision) {
       snapshot = next; model = buildTrips(snapshot, stationsConfig);
       renderTrainDetails(); renderUnplaced();
     }
@@ -360,7 +361,7 @@ function renderSourceStatus() {
   document.querySelector('#api-version-warning').hidden = !Object.values(snapshot.stations).some((station) => station.needReload === true);
   const successful = Object.values(snapshot.stations).filter((station) => station.lastSuccessfulAt);
   const errors = Object.values(snapshot.stations).filter((station) => station.error || station.needReload);
-  const latest = successful.map((station) => parseTime(station.lastSuccessfulAt)).sort((a, b) => a - b)[0];
+  const latest = Math.max(...successful.map((station) => parseTime(station.lastSuccessfulAt)));
   const cycleBudgetMs = (appConfig.collector.cyclePauseSeconds
     + stationsConfig.pollStationApiIds.length * (appConfig.collector.requestTimeoutSeconds + appConfig.collector.minRequestIntervalMs / 1000) + 60) * 1000;
   const stale = Date.now() - (parseTime(snapshot.publishedAt) || 0) > cycleBudgetMs;
@@ -372,7 +373,7 @@ function renderSourceStatus() {
   const label = document.querySelector('#train-counter-label');
   if (label.textContent !== counterLabel) label.textContent = counterLabel;
   document.querySelector('#source-status').textContent = !successful.length
-    ? (localError ? 'Локальное расписание недоступно' : 'Ожидание расписания от сборщика')
+    ? (localError ? `Расписание недоступно: ${localError.message || localError}` : 'Загрузка расписания из браузера')
     : `${localError || errors.length || stale ? 'Последние данные' : 'Обновлено'} ${formatTime(latest)} · ${successful.length}/${stationsConfig.pollStationApiIds.length} станции`;
 }
 
