@@ -49,6 +49,9 @@ for (const [index, station] of stations.stations.entries()) {
 }
 assert.equal(app.timezone, stations.timezone);
 assert.equal(app.motion.anchorField, 'departureTime');
+assert(app.map.tileNativeMaxZoom >= app.map.minZoom && app.map.tileNativeMaxZoom < app.map.maxZoom);
+assert(app.map.tileBlurStepPx > 0);
+assert(app.map.corridorBufferMeters > 0);
 assert(app.collector.minRequestIntervalMs >= 1000);
 assert(app.collector.cyclePauseSeconds >= 300);
 assert.equal(app.map.trainRendering.wagonCount, 6);

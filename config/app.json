@@ -5,6 +5,8 @@
     "tileProvider": "thunderforest",
     "tileStyle": "transport",
     "corridorBufferMeters": 500,
+    "tileNativeMaxZoom": 12,
+    "tileBlurStepPx": 1.5,
     "minZoom": 9,
     "maxZoom": 18,
     "overviewMaxZoom": 14,

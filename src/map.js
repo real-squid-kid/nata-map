@@ -1,6 +1,6 @@
 import L from 'leaflet';
 import { createCorridor } from './corridor.js';
-import { createCorridorTileLayer } from './corridor-tiles.js';
+import { createMapTileLayer } from './map-tiles.js';
 import { createTrackGeometry } from './geometry.js';
 import { createTrainRenderer } from './train-renderer.js';
 
@@ -21,7 +21,8 @@ export function createSectionMap({ container, railway, stationsConfig, options, 
     scrollWheelZoom: true,
     attributionControl: true,
   });
-  // Снизу вверх: тайлы → затемнение → линии → станции → поезда.
+  // Снизу вверх: размытая подложка z12 → подробности в коридоре → затемнение → линии → станции → поезда.
+  map.createPane('tile-details').style.zIndex = 210;
   for (const [name, zIndex] of [['dimming', 250], ['routes', 350], ['stations', 450], ['trains', 550]]) {
     const pane = map.createPane(name);
     pane.style.zIndex = zIndex;
@@ -64,11 +65,34 @@ export function createSectionMap({ container, railway, stationsConfig, options, 
     stationLocations: stationsConfig.stations.map((station) => [station.location.longitude, station.location.latitude]),
     bufferMeters: options.corridorBufferMeters,
   });
-  const tiles = createCorridorTileLayer({
-    corridor, apiKey, style: options.tileStyle,
-    minZoom: options.minZoom, maxZoom: options.maxZoom, onStats,
+  const tileStats = [{}, {}];
+  const reportTileStats = (index) => (stats) => {
+    tileStats[index] = stats;
+    const totals = {};
+    for (const key of ['requested', 'cacheHits', 'pending', 'loaded', 'failed', 'withoutKey', 'blocked']) {
+      totals[key] = (tileStats[0][key] || 0) + (tileStats[1][key] || 0);
+    }
+    onStats(totals);
+  };
+  const baseTiles = createMapTileLayer({
+    apiKey, style: options.tileStyle,
+    minZoom: options.minZoom, maxZoom: options.maxZoom,
+    nativeMaxZoom: options.tileNativeMaxZoom, onStats: reportTileStats(0),
   });
-  tiles.addTo(map);
+  baseTiles.addTo(map);
+  const detailTiles = createMapTileLayer({
+    apiKey, style: options.tileStyle,
+    minZoom: options.tileNativeMaxZoom + 1, maxZoom: options.maxZoom,
+    corridor, pane: 'tile-details', onStats: reportTileStats(1),
+  });
+  detailTiles.addTo(map);
+  function updateTileBlur() {
+    const steps = Math.max(0, map.getZoom() - options.tileNativeMaxZoom);
+    const radius = steps * options.tileBlurStepPx;
+    baseTiles.getContainer().style.filter = radius ? `blur(${radius}px)` : '';
+  }
+  map.on('zoom', updateTileBlur);
+  updateTileBlur();
 
   // Светлая обводка отделяет выбранную траекторию от железных дорог подложки.
   L.polyline(latLngs, { pane: 'routes', color: '#fffef6', weight: 8, opacity: 0.95, interactive: false }).addTo(map);

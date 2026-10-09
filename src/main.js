@@ -54,11 +54,11 @@ app.innerHTML = `
           <summary>Диагностика карты</summary>
           <dl>
             <div><dt>Масштаб</dt><dd id="zoom-value">—</dd></div>
-            <div><dt>Коридор</dt><dd>500 м</dd></div>
+            <div><dt>Исходные тайлы</dt><dd>до z12</dd></div>
+            <div><dt>Подробные тайлы</dt><dd>коридор 500 м</dd></div>
             <div><dt>Запросов к Thunderforest</dt><dd id="tiles-requested">0</dd></div>
             <div><dt>Из локального кэша</dt><dd id="tiles-cached">0</dd></div>
             <div><dt>Ожидают загрузки</dt><dd id="tiles-pending">0</dd></div>
-            <div><dt>Вне коридора, без запросов</dt><dd id="tiles-blocked">0</dd></div>
             <div><dt>Загружено</dt><dd id="tiles-loaded">0</dd></div>
             <div><dt>Ошибок</dt><dd id="tiles-failed">0</dd></div>
           </dl><p>Счётчики с момента открытия карты.</p>
@@ -249,13 +249,13 @@ let statsFrame;
 function renderStats(stats) {
   cancelAnimationFrame(statsFrame);
   statsFrame = requestAnimationFrame(() => {
-    for (const key of ['requested', 'blocked', 'loaded', 'failed']) document.querySelector(`#tiles-${key}`).textContent = stats[key];
+    for (const key of ['requested', 'loaded', 'failed']) document.querySelector(`#tiles-${key}`).textContent = stats[key];
     document.querySelector('#tiles-cached').textContent = stats.cacheHits;
     document.querySelector('#tiles-pending').textContent = stats.pending;
     const pending = stats.pending;
     document.querySelector('#tile-status').textContent = !apiKey ? 'Подложка не подключена'
       : pending > 0 ? 'Загрузка подложки…' : stats.failed > 0 ? (stats.loaded > 0 ? 'Часть подложки не загрузилась' : 'Подложка недоступна')
-      : stats.loaded > 0 ? 'Подложка загружена' : 'Серый фон вне коридора';
+      : stats.loaded > 0 ? 'Подложка загружена' : 'Подложка не загружена';
     document.querySelector('#status-light').dataset.state = !apiKey || stats.failed > 0 ? 'warning' : pending > 0 ? 'loading' : 'ready';
   });
 }

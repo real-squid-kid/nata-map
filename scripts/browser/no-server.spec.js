@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { createCorridor } from '../../src/corridor.js';
 
 const config = JSON.parse(await readFile(new URL('../../config/stations.json', import.meta.url), 'utf8'));
+const railway = JSON.parse(await readFile(new URL('../../config/railway.geojson', import.meta.url), 'utf8'));
+const corridor = createCorridor({
+  coordinates: railway.features[0].geometry.coordinates,
+  stationLocations: config.stations.map((station) => [station.location.longitude, station.location.latitude]),
+  bufferMeters: 500,
+});
 const readSnapshot = (page) => page.evaluate(() => new Promise((resolve, reject) => {
   const open = indexedDB.open('nata-map-no-server-v1', 1);
   open.onerror = () => reject(open.error);
@@ -12,11 +19,14 @@ const readSnapshot = (page) => page.evaluate(() => new Promise((resolve, reject)
   };
 }));
 
-async function interceptSource(context, calls) {
-  await context.route((url) => url.hostname.endsWith('.thunderforest.com'), (route) => route.fulfill({
-    contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' },
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
-  }));
+async function interceptSource(context, calls, tileUrls = []) {
+  await context.route((url) => url.hostname.endsWith('.thunderforest.com'), (route) => {
+    tileUrls.push(route.request().url());
+    return route.fulfill({
+      contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' },
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
+    });
+  });
   await context.route('https://mcd.nata-info.ru/api/v2**', (route) => {
     const stationId = Number(new URL(route.request().url()).searchParams.get('station'));
     calls.push(stationId);
@@ -31,6 +41,54 @@ async function interceptSource(context, calls) {
       headers: { 'access-control-allow-origin': '*' } });
   });
 }
+
+test('до z12 сплошная подложка, выше подробности только в коридоре', async ({ context }) => {
+  const calls = [];
+  const tileUrls = [];
+  await interceptSource(context, calls, tileUrls);
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.locator('.map-diagnostics').evaluate((element) => { element.open = true; });
+  await expect.poll(() => tileUrls.length).toBeGreaterThan(0);
+  const requestedCoords = () => tileUrls.map((url) => {
+    const match = new URL(url).pathname.match(/\/(\d+)\/(\d+)\/(\d+)\.png$/);
+    return { z: Number(match[1]), x: Number(match[2]), y: Number(match[3]) };
+  });
+  expect(requestedCoords().every(({ z }) => z <= 12)).toBe(true);
+
+  await page.locator('.station-button[data-station-id="grazhdanskaya"]').click();
+  await expect(page.locator('#zoom-value')).toHaveText('15');
+  await expect.poll(() => page.locator('.map-base-tile[data-tile-coords^="12/"] img').count()).toBeGreaterThan(0);
+  await expect.poll(() => page.locator('.map-detail-tile[data-tile-coords^="15/"] img').count()).toBeGreaterThan(0);
+  await expect.poll(() => page.locator('.map-detail-tile[data-tile-state="blocked"]').count()).toBeGreaterThan(0);
+  await expect.poll(() => page.locator('.leaflet-tile-pane .leaflet-layer').evaluate((node) => getComputedStyle(node).filter))
+    .toBe('blur(4.5px)');
+  await expect.poll(() => page.locator('.leaflet-tile-details-pane .leaflet-layer').evaluate((node) => getComputedStyle(node).filter))
+    .toBe('none');
+  expect(await page.locator('.map-detail-tile[data-tile-state="blocked"]').first().evaluate((node) => getComputedStyle(node).backgroundColor))
+    .toBe('rgba(0, 0, 0, 0)');
+  await expect.poll(() => page.locator('#tiles-pending').textContent()).toBe('0');
+  for (let zoom = 16; zoom <= 18; zoom++) {
+    await page.locator('#zoom-in').click();
+    await expect(page.locator('#zoom-value')).toHaveText(String(zoom));
+  }
+  await expect.poll(() => page.locator('.leaflet-tile-pane .leaflet-layer').evaluate((node) => getComputedStyle(node).filter))
+    .toBe('blur(9px)');
+  await expect.poll(() => page.locator('#tiles-pending').textContent()).toBe('0');
+  expect(requestedCoords().some(({ z }) => z === 18)).toBe(true);
+  expect(requestedCoords().filter(({ z }) => z > 12).every((coords) => corridor.intersectsTile(coords))).toBe(true);
+  expect(await page.locator('.map-detail-tile[data-tile-state="blocked"] img').count()).toBe(0);
+  for (let zoom = 17; zoom >= 11; zoom--) {
+    await page.locator('#zoom-out').click();
+    await expect(page.locator('#zoom-value')).toHaveText(String(zoom));
+  }
+  await expect.poll(() => page.locator('#tiles-pending').textContent()).toBe('0');
+  expect(requestedCoords().map(({ z }) => z)).toContain(11);
+  expect(requestedCoords().filter(({ z }) => z > 12).every((coords) => corridor.intersectsTile(coords))).toBe(true);
+  expect(await page.locator('.map-base-tile:not(:has(img))').count()).toBe(0);
+  await expect.poll(() => page.locator('.leaflet-tile-pane .leaflet-layer').evaluate((node) => getComputedStyle(node).filter))
+    .toBe('none');
+});
 
 test('один опросчик на две вкладки, полный цикл и пауза после перезагрузки', async ({ context }) => {
   test.setTimeout(60000);

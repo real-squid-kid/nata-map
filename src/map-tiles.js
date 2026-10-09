@@ -1,21 +1,26 @@
 import L from 'leaflet';
 import { getTileBlob } from './tile-cache.js';
 
-export function createCorridorTileLayer({ corridor, apiKey, style, minZoom, maxZoom, onStats }) {
-  const stats = { requested: 0, cacheHits: 0, pending: 0, blocked: 0, loaded: 0, failed: 0, withoutKey: 0 };
+export function createMapTileLayer({ apiKey, style, minZoom, maxZoom, nativeMaxZoom, corridor, pane, onStats }) {
+  const stats = { requested: 0, cacheHits: 0, pending: 0, loaded: 0, failed: 0, withoutKey: 0, blocked: 0 };
   const notify = () => onStats({ ...stats });
   const Layer = L.GridLayer.extend({
     createTile(coords, done) {
       const tile = document.createElement('div');
-      tile.className = 'corridor-tile';
+      tile.className = corridor ? 'map-tile map-detail-tile' : 'map-tile map-base-tile';
       tile.dataset.tileCoords = `${coords.z}/${coords.x}/${coords.y}`;
-      const allowed = corridor.intersectsTile(coords);
-      tile.dataset.inCorridor = String(allowed);
 
-      // Сначала геометрическая проверка. У внешней ячейки нет ни img, ни внешнего src.
-      if (!allowed || !apiKey) {
-        tile.dataset.tileState = allowed ? 'without-key' : 'blocked';
-        stats[allowed ? 'withoutKey' : 'blocked']++;
+      if (corridor && !corridor.intersectsTile(coords)) {
+        tile.dataset.tileState = 'blocked';
+        stats.blocked++;
+        notify();
+        requestAnimationFrame(() => done(null, tile));
+        return tile;
+      }
+
+      if (!apiKey) {
+        tile.dataset.tileState = 'without-key';
+        stats.withoutKey++;
         notify();
         requestAnimationFrame(() => done(null, tile));
         return tile;
@@ -50,14 +55,6 @@ export function createCorridorTileLayer({ corridor, apiKey, style, minZoom, maxZ
         finish(new Error('Не удалось загрузить тайл подложки'));
       };
       tile.append(image);
-      // Сглаживаем только границу с запрещёнными ячейками. Соседям fetch не нужен.
-      for (const [side, dx, dy] of [['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]]) {
-        if (corridor.intersectsTile({ z: coords.z, x: coords.x + dx, y: coords.y + dy })) continue;
-        const edge = document.createElement('span');
-        edge.className = `tile-edge-blur edge-${side}`;
-        edge.setAttribute('aria-hidden', 'true');
-        tile.append(edge);
-      }
       notify();
       getTileBlob({ style, coords, apiKey,
         onNetwork() { stats.requested++; notify(); }, onCache() { stats.cacheHits++; notify(); },
@@ -71,9 +68,10 @@ export function createCorridorTileLayer({ corridor, apiKey, style, minZoom, maxZ
   });
 
   const layer = new Layer({
-    tileSize: 256, minZoom, maxZoom,
+    tileSize: 256, minZoom, maxZoom, ...(nativeMaxZoom == null ? {} : { maxNativeZoom: nativeMaxZoom }),
+    ...(pane ? { pane } : {}),
     noWrap: true,
-    keepBuffer: 0,
+    keepBuffer: 1,
     updateWhenIdle: true,
     updateWhenZooming: false,
     attribution: 'Maps © <a href="https://www.thunderforest.com/" target="_blank" rel="noopener">Thunderforest</a>',

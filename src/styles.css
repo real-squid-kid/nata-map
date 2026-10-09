@@ -226,13 +226,8 @@ body {
 .status-light[data-state="ready"] { background: #81986a; }
 .status-light[data-state="warning"] { background: #c2a365; }
 
-.corridor-tile { background: #daddd5; }
-.corridor-tile img { display: block; width: 100%; height: 100%; max-width: none; }
-.tile-edge-blur { position: absolute; pointer-events: none; backdrop-filter: blur(5px); background: linear-gradient(var(--edge-direction), #daddd5, #daddd500); mask-image: linear-gradient(var(--edge-direction), #000 55%, transparent); }
-.edge-north { inset: 0 0 auto; height: 32px; --edge-direction: to bottom; }
-.edge-south { inset: auto 0 0; height: 32px; --edge-direction: to top; }
-.edge-west { inset: 0 auto 0 0; width: 32px; --edge-direction: to right; }
-.edge-east { inset: 0 0 0 auto; width: 32px; --edge-direction: to left; }
+.map-base-tile { background: #daddd5; }
+.map-tile img { display: block; width: 100%; height: 100%; max-width: none; }
 .station-marker { background: transparent; border: none; }
 .station-pin {
   position: absolute;
