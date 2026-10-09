@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [tailwindcss()],
     server: {
-      host: '127.0.0.1',
+      host: process.env.NATA_HOST || '127.0.0.1',
       port: 5173,
       strictPort: true,
       proxy: { '/api': { target: env.PHP_API_TARGET || 'http://127.0.0.1:8080' } },

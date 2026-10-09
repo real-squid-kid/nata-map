@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node scripts/dev.mjs",
+    "start:lan": "node scripts/dev.mjs --lan",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

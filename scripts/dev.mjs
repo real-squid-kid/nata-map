@@ -10,16 +10,18 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const execute = promisify(execFile);
-const host = '127.0.0.1';
-const apiUrl = `http://${host}:8080/api/health`;
-const mapUrl = `http://${host}:5173`;
+const lanMode = process.argv.includes('--lan');
+const host = lanMode ? '0.0.0.0' : '127.0.0.1';
+const localHost = '127.0.0.1';
+const apiUrl = `http://${localHost}:8080/api/health`;
+const mapUrl = `http://${localHost}:5173`;
 
-async function checkPort(port) {
+async function checkPort(port, address = host) {
   const server = createServer();
   try {
     await new Promise((accept, reject) => {
       server.once('error', reject);
-      server.listen({ host, port, exclusive: true }, accept);
+      server.listen({ host: address, port, exclusive: true }, accept);
     });
   } catch {
     throw new Error(`Порт ${port} занят или недоступен. Остановите прежний сервис и повторите запуск.`);
@@ -42,7 +44,7 @@ async function preflight(signal) {
     if (signal.aborted) throw error;
     throw new Error('Нужен PHP 8.2+ в PATH. Проверьте php --version.');
   }
-  await Promise.all([checkPort(8080), checkPort(5173)]);
+  await Promise.all([checkPort(8080, localHost), checkPort(5173, host)]);
   const lockPath = resolve(root, 'var/collector.lock');
   try {
     await access(lockPath);
@@ -155,14 +157,19 @@ export async function runDevelopment({
   try {
     log('[запуск] Проверяю окружение, порты и блокировку сборщика…');
     await check(signal);
-    await add('API', 'php', ['-S', `${host}:8080`, '-t', 'server', 'server/router.php']);
+    await add('API', 'php', ['-S', `${localHost}:8080`, '-t', 'server', 'server/router.php']);
     await ready(apiUrl, signal, { health: true });
-    await add('фронт', process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js')]);
+    await add('фронт', process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js'), ...(lanMode ? ['--host', host] : [])]);
     await ready(mapUrl, signal);
     // Не начинаем опрос внешнего API, пока оба локальных сервиса не готовы.
     await add('сборщик', 'php', ['server/collector.php']);
     signal.throwIfAborted();
-    log(`[запуск] Карта: ${mapUrl}. Сборщик запущен; первое расписание может появиться не сразу. Остановка: Ctrl+C.`);
+    const urls = lanMode
+      ? [...new Set(Object.values((await import('node:os')).networkInterfaces()).flat()
+        .filter((address) => address && !address.internal && (address.family === 'IPv4' || address.family === 4))
+        .map((address) => `http://${address.address}:5173/`))]
+      : [];
+    log(`[запуск] Карта: ${mapUrl}${urls.length ? `. Локальная сеть: ${urls.join(' | ')}` : ''}. Сборщик запущен; первое расписание может появиться не сразу. Остановка: Ctrl+C.`);
     if (!signal.aborted) await new Promise((accept) => signal.addEventListener('abort', accept, { once: true }));
   } catch (error) {
     if (!signal.aborted) fail(error.message);
